@@ -1,0 +1,8 @@
+tax_rank,Total_taxa,Denovo_taxa,Percent_denovo
+Kingdom,2,0,0
+Phylum,45,1,2.22
+Class,118,12,10.17
+Order,271,66,24.35
+Family,585,276,47.18
+Genus,1816,1324,72.91
+Species,4170,3973,95.28

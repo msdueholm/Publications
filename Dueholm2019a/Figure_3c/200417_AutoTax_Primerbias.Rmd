@@ -1,0 +1,64 @@
+---
+title: "AutoTax figure 3a: Primerbias"
+author: "Morten Simonsen Dueholm"
+date: "2020-04-17"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+```
+## Set working directory
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+read_primerbias <- function(input) {
+  map <- read.delim(input,
+                      sep = ",",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      skip=12) %>%
+    select(1,10) %>%
+    rename(ESV = "V1") %>%
+    arrange(readr::parse_number(ESV)) %>%
+    mutate(p_id=!!gsub("data/(.+)_ESVs_hits.txt", "\\1", paste(input))) %>%
+    separate(p_id,into=c("Primer","Primer_set"), sep="_") %>%
+    mutate(V10=as.numeric(V10))}
+
+file_list <- list.files("data/", full.names=TRUE)
+
+for (file in file_list){
+# if the merged dataset doesn't exist, create it
+  if (!exists("dataset")){
+    dataset <- read_primerbias(file)
+  }
+   
+  # if the merged dataset does exist, append to it
+  if (exists("dataset")){
+    temp_dataset <-read_primerbias(file)
+    dataset<-rbind(dataset, temp_dataset)
+    rm(temp_dataset)
+  } 
+}
+
+```
+
+## Summarize_data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Summary <- dataset %>%
+  group_by(ESV,Primer_set) %>%
+  summarize("Match"=if_else(max(V10)==0, "Perfect", if_else(max(V10)>1, "Poor", "Partial"))) %>%
+  spread("Primer_set", "Match")
+```
+
+## Export data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+write.csv(Summary, file="output/Primerbias.csv", quote= FALSE, sep=",", eol="\n", row.names = FALSE)
+```
