@@ -1,0 +1,145 @@
+---
+title: "AutoTax figure 1c, and S2a: Coverage of Amplicons from Gonzalez-Martinez2016"
+author: "Morten Simonsen Dueholm"
+date: "2020-05-12"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+```
+## Set working directory
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Define function to read mapping results
+read_amp_mappings <- function(input) {
+  map <- read.delim(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+      select(1,3) %>%
+      rename(ASV = V1, !!gsub(".*vs_(.+).b6", "\\1", paste(input)):=V3) %>%
+      arrange(readr::parse_number(ASV))
+    }
+
+# Import read mappings for all reference databases
+a <- read_amp_mappings("data/ASVs_vs_FL-ASVs.b6")
+b <- read_amp_mappings("data/ASVs_vs_FL-ASVs+FL-OTUs-CF%.b6")
+c <- read_amp_mappings("data/ASVs_vs_FL-ASVs+FL-OTUs-CF+.b6")
+d <- read_amp_mappings("data/ASVs_vs_MiDAS_2.1.b6")
+e <- read_amp_mappings("data/ASVs_vs_gg_16s_13.5.b6")
+f <- read_amp_mappings("data/ASVs_vs_RDP_all_11.5.b6")
+g <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef_Nr99.b6")
+h <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef.b6")
+i <- read_amp_mappings("data/ASVs_vs_GTDB_r89.b6")
+
+# Create a merged dataframe with all read mappings
+V13ASV_vs_all <- list(a,b,c,d,e,f,g,h,i) %>%
+  reduce(left_join, by = "ASV")
+
+# Read ASV-table
+  ASVtable <- read.delim("data/V13ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+    rename(ASV=1) %>%
+      arrange(readr::parse_number(ASV))
+
+# Merge ASV table and read mapping data based on ASVs
+df <- left_join(ASVtable, V13ASV_vs_all, by="ASV")
+
+# Determine the relative abundance of each ASV in each sample
+ranked <- df %>%
+  gather(2:7, key="SeqID", value="counts") %>%
+  group_by(SeqID) %>%
+  arrange(desc(counts)) %>%
+  mutate(rank = row_number(), relative_abundance = counts/sum(counts)*100) %>%
+  ungroup() %>%
+  gather(2:10, key="database", value="Identity") %>%
+  mutate(database = factor(database, levels = c("FL-ASVs","FL-ASVs+FL-OTUs-CF%","FL-ASVs+FL-OTUs-CF+", "gg_16s_13.5", "GTDB_r89","MiDAS_2.1","RDP_all_11.5", "SILVA_138_SSURef_Nr99", "SILVA_138_SSURef")))
+
+# Load sample metadata
+Sample_metadata <- read.delim("data/Sample_metadata.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+
+# Merge the ASV relative abundance data with the metadata
+ranked_w_metadata <- left_join(ranked, Sample_metadata, by="SeqID")
+```
+
+#Determine coverage at of amplicons with relative abundance >0.01% for figure 1c
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+coverage <- ranked_w_metadata %>%
+  filter(relative_abundance >= 0.01 & database=="FL-ASVs") %>%
+  group_by(SeqID,database) %>%
+  summarize("coverage"=sum(relative_abundance)) %>%
+  group_by(database) %>%
+  summarise(mean=mean(coverage), sd=sd(coverage), n=n())
+```
+
+# Summarize data for figures
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+d1 <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.01 & counts>0) %>%
+  group_by(database) %>%
+  summarize("100%"=sum(Identity==100.0)/n()*100,
+            ">98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            ">94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n(),
+            "Relative_abundance"=paste("Dutch WWTPs\n","Relative abundance > 0.01%\n","Coverage: ",sprintf("%.1f", coverage$mean),"% ± ",sprintf("%.1f",coverage$sd),"%, n=",coverage$n, sep="")) %>%
+  gather(2:4, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c(">94.5%",">98.7%","100%")))
+
+d2 <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.01) %>%
+  group_by(WWTP, database) %>%
+  summarize("100%"=sum(Identity==100.0)/n()*100,
+            ">98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            ">94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n()) %>%
+  gather(3:5, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c(">94.5%",">98.7%","100%")))
+```
+
+## Plot histogram
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Figure1c <- ggplot(data=d1, aes(x=database, y=fraction, fill=Identity)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent of ASVs mapped") + 
+  theme(axis.title.x=element_blank()) +
+  facet_grid(.~Relative_abundance) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10), expand=c(0,2))
+
+FigureS2a<- ggplot(data=d2, aes(x=database, y=fraction, fill=Identity)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent of ASVs with relative abundance\n higher than 0.01% mapped") + 
+  theme(axis.title.x=element_blank()) +
+  facet_wrap(~WWTP, ncol = 6) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10), expand=c(0,2))
+```
+
+## Export data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggsave(filename="output/Figure1c.pdf", plot=Figure1c, width=4.5, height=3.5, useDingbats=FALSE, limitsize=FALSE)
+ggsave(filename="output/FigureS2a.pdf", plot=FigureS2a, width=12, height=3.5, useDingbats=FALSE, limitsize=FALSE)
+```
