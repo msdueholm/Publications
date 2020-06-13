@@ -1,0 +1,107 @@
+---
+title: "AutoTax figure 3b: Classification of in Silico Amplicons - Effect of chimera"
+author: "Morten Simonsen Dueholm"
+date: "2020-04-22"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+```
+## Set working directory
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+read_amp_classification <- function(input) {
+  map <- read.delim(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+      select(1,4) %>%
+      rename(ASV = V1) %>%
+      arrange(readr::parse_number(ASV)) %>%
+      mutate(ASV = str_replace_all(ASV, "[:blank:].*", "")) %>%
+      mutate(V4 = str_replace_all(V4, c("d:"), "")) %>%
+      mutate(V4 = str_replace_all(V4, c(",p:"), ",")) %>%
+    mutate(V4 = str_replace_all(V4, c(",c:"), ",")) %>%
+    mutate(V4 = str_replace_all(V4, c(",o:"), ",")) %>%
+    mutate(V4 = str_replace_all(V4, c(",f:"), ",")) %>%
+    mutate(V4 = str_replace_all(V4, c(",g:"), ",")) %>%
+    mutate(V4 = str_replace_all(V4, c(",s:"), ",")) %>%
+      separate(V4,sep=",", into = c("ASV_Domain", "ASV_Phylum", "ASV_Order", "ASV_Class", "ASV_Familiy", "ASV_Genus", "ASV_Species" )) %>%
+      mutate(Amplicon=!!gsub("data/(.+).sintax", "\\1", paste(input))) %>%
+    separate(Amplicon,sep="_", into = c("Primerset", "Database"))
+    }
+
+a <- read_amp_classification("data/V13_FL-ASVs.sintax")
+b <- read_amp_classification("data/V13_FL-ASVs+FL-OTUs.sintax")
+c <- read_amp_classification("data/V4_FL-ASVs.sintax")
+d <- read_amp_classification("data/V4_FL-ASVs+FL-OTUs.sintax")
+e <- read_amp_classification("data/V18_FL-ASVs.sintax")
+f <- read_amp_classification("data/V18_FL-ASVs+FL-OTUs.sintax")
+g <- read_amp_classification("data/V19_FL-ASVs.sintax")
+h <- read_amp_classification("data/V19_FL-ASVs+FL-OTUs.sintax")
+i <- read_amp_classification("data/V34_FL-ASVs.sintax")
+j <- read_amp_classification("data/V34_FL-ASVs+FL-OTUs.sintax")
+k <- read_amp_classification("data/V35_FL-ASVs.sintax")
+l <- read_amp_classification("data/V35_FL-ASVs+FL-OTUs.sintax")
+m <- read_amp_classification("data/V45_FL-ASVs.sintax")
+n <- read_amp_classification("data/V45_FL-ASVs+FL-OTUs.sintax")
+o <- read_amp_classification("data/V57_FL-ASVs.sintax")
+p <- read_amp_classification("data/V57_FL-ASVs+FL-OTUs.sintax")
+q <- read_amp_classification("data/V58_FL-ASVs.sintax")
+r <- read_amp_classification("data/V58_FL-ASVs+FL-OTUs.sintax")
+
+Merged_classifications <- bind_rows(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r)
+
+# Read reference taxonomy
+Tax_ref <- read.delim("data/tax_complete.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+    rename(ASV=1) %>%
+      arrange(readr::parse_number(ASV))
+
+# Merge ASV table and mappings
+df <- left_join(Tax_ref, Merged_classifications, by="ASV") %>% replace(.,is.na(.),0) %>%
+  mutate(Primerset = factor(Primerset, levels = c("V13","V34","V35","V4","V45","V57","V58","V18","V19"))) %>%
+  mutate(Database = factor(Database, levels = c("FL-ASVs","FL-ASVs+FL-OTUs")))
+```
+
+#Summarize_data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Summary <- df %>%
+  group_by(Primerset,Database) %>%
+  summarize("Genus"=sum(Genus==ASV_Genus)/n()*100,
+            "Species"=sum(Species==ASV_Species)/n()*100) %>%
+  gather(3:4, key = "Taxonomic_rank", value = "Percentage")
+```
+
+## Plot histogram
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+p <- ggplot(data=Summary, aes(x=Primerset, y=Percentage, fill=Database)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity",position = position_dodge(preserve = 'single'), width=0.8) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent in silico ASVs correctly classified") +
+  facet_grid(.~Taxonomic_rank) +
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10))
+```
+
+## Export data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggsave(filename="output/FigureS5b.pdf", plot=p, width=10, height=4, useDingbats=FALSE, limitsize=FALSE)
+
+```

@@ -31,17 +31,16 @@ read_amp_mappings <- function(input) {
 
 # Import read mappings for all reference databases
 a <- read_amp_mappings("data/ASVs_vs_FL-ASVs.b6")
-b <- read_amp_mappings("data/ASVs_vs_FL-ASVs+FL-OTUs-CF%.b6")
-c <- read_amp_mappings("data/ASVs_vs_FL-ASVs+FL-OTUs-CF+.b6")
-d <- read_amp_mappings("data/ASVs_vs_MiDAS_2.1.b6")
-e <- read_amp_mappings("data/ASVs_vs_gg_16s_13.5.b6")
-f <- read_amp_mappings("data/ASVs_vs_RDP_all_11.5.b6")
-g <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef_Nr99.b6")
-h <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef.b6")
-i <- read_amp_mappings("data/ASVs_vs_GTDB_r89.b6")
+b <- read_amp_mappings("data/ASVs_vs_FL-ASVs+FL-OTUs.b6")
+c <- read_amp_mappings("data/ASVs_vs_MiDAS_2.1.b6")
+d <- read_amp_mappings("data/ASVs_vs_gg_16s_13.5.b6")
+e <- read_amp_mappings("data/ASVs_vs_RDP_all_11.5.b6")
+f <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef_NR99.b6")
+g <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef.b6")
+h <- read_amp_mappings("data/ASVs_vs_GTDB_r89.b6")
 
 # Create a merged dataframe with all read mappings
-ASV_vs_all <- list(a,b,c,d,e,f,g,h,i) %>%
+ASV_vs_all <- list(a,b,c,d,e,f,g,h) %>%
   reduce(left_join, by = "ASV")
 
 # Read ASV-table
@@ -65,8 +64,8 @@ ranked <- df %>%
   arrange(desc(counts)) %>%
   mutate(rank = row_number(), relative_abundance = counts/sum(counts)*100) %>%
   ungroup() %>%
-  gather(2:10, key="database", value="Identity") %>%
-  mutate(database = factor(database, levels = c("FL-ASVs","FL-ASVs+FL-OTUs-CF%","FL-ASVs+FL-OTUs-CF+", "gg_16s_13.5", "GTDB_r89","MiDAS_2.1","RDP_all_11.5", "SILVA_138_SSURef_Nr99", "SILVA_138_SSURef")))
+  gather(2:9, key="database", value="Identity") %>%
+  mutate(database = factor(database, levels = c("FL-ASVs","FL-ASVs+FL-OTUs", "gg_16s_13.5", "GTDB_r89","MiDAS_2.1","RDP_all_11.5", "SILVA_138_SSURef_NR99", "SILVA_138_SSURef")))
 
 # Load sample metadata
 Sample_metadata <- read.delim("data/SraRunTable.txt",
