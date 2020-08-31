@@ -1,0 +1,62 @@
+---
+title: "AutoTax figure S3a: Evaluation of AutoTax ESV classification - Training set"
+author: "Morten Simonsen Dueholm"
+date: "2020-05-17"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(data.table)
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+```
+## Set working directory
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+```
+
+## Define functions to import and arrange classifications
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+read_b6_idty <- function(input) {
+  map <- read.delim(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+      select(1,3) %>%
+      rename(ESV = V1) %>%
+      rename(idty = V3) %>%
+      mutate(idty=round(idty, digits = 0)) %>%
+      mutate(Dataset=!!gsub("data/(.+).b6", "\\1", paste(input)))}
+```
+
+## Load classifications
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+#True taxonomy
+Test_data <- read_b6_idty("data/Test_data.b6")
+Real_data <- read_b6_idty("data/Real_data.b6")
+
+df <- rbind(Real_data, Test_data) %>%
+  filter(idty>=80) %>%
+  mutate(idty = fct_rev(as.factor(idty))
+
+Summary()
+```    
+
+# Plot data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+FigureS3a <- ggplot(data=df, aes(x=as.factor(idty), fill=Dataset)) +
+  theme_bw() +
+  geom_bar(color="black", position = "dodge", width=0.8) +
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Sequences") +
+  xlab("Top hit identity")
+```
+
+## Export figures
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggsave(filename="output/FigureS3a.pdf", plot=FigureS3a, width=8, height=4, useDingbats=FALSE, limitsize=FALSE)
+```

@@ -1,0 +1,212 @@
+---
+title: "AutoTax figure 1b and S1: Coverage of Amplicons"
+author: "Morten Simonsen Dueholm"
+date: "2020-05-12"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+```
+## Set working directory
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+read_amp_mappings <- function(input) {
+  map <- read.delim(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+      select(1,3) %>%
+      rename(ASV = V1, !!gsub(".*vs_(.+).b6", "\\1", paste(input)):=V3) %>%
+      arrange(readr::parse_number(ASV))
+    }
+
+a <- read_amp_mappings("data/ASVs_vs_FL-ASVs.b6")
+b <- read_amp_mappings("data/ASVs_vs_FL-ASVs+FL-OTUs.b6")
+c <- read_amp_mappings("data/ASV_vs_MiDAS_2.1.b6")
+d <- read_amp_mappings("data/ASV_vs_gg_16s_13.5.b6")
+e <- read_amp_mappings("data/ASV_vs_RDP_all_11.5.b6")
+f <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef_NR99.b6")
+g <- read_amp_mappings("data/ASVs_vs_SILVA_138_SSURef.b6")
+h <- read_amp_mappings("data/ASVs_vs_GTDB_r89.b6")
+
+ASV_vs_all <- list(a,b,c,d,e,f,g,h) %>%
+  reduce(full_join, by = "ASV") %>% {
+    .[is.na(.)] <- 0
+    return(.)
+  }
+
+# Read ASV table
+  ASVtable <- read.delim("data/ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+    rename(ASV=1) %>%
+      arrange(readr::parse_number(ASV))
+
+# Merge ASV table and mappings
+df <- left_join(ASVtable, ASV_vs_all, by="ASV")
+
+# Ranked abundance
+ranked <- df %>%
+  gather(2:49, key="SeqID", value="counts") %>%
+  group_by(SeqID) %>%
+  arrange(desc(counts)) %>%
+  mutate(rank = row_number(), relative_abundance = counts/sum(counts)*100) %>%
+  ungroup() %>%
+  gather(2:9, key="database", value="Identity") %>%
+  mutate(database = factor(database, levels = c("FL-ASVs","FL-ASVs+FL-OTUs", "gg_16s_13.5", "GTDB_r89","MiDAS_2.1","RDP_all_11.5", "SILVA_138_SSURef_NR99", "SILVA_138_SSURef")))
+
+Sample_metadata <- read.delim("data/Sample_metadata.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+
+ranked_w_metadata <- left_join(ranked, Sample_metadata, by="SeqID")
+```
+
+Determine coverage at specific relative abundance thresholdes used for figure 1c
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+coverage_01pct <- ranked_w_metadata %>%
+  filter(relative_abundance >= 0.1 & database=="FL-ASVs") %>%
+  group_by(SeqID,database, Environment) %>%
+  summarize("coverage"=sum(relative_abundance)) %>%
+  group_by(Environment) %>%
+  summarise(mean=mean(coverage), sd=sd(coverage), n=n())
+
+header_01pct <- paste("Relative abundance > 0.1%\n Coverage AS: ",sprintf("%.1f", coverage_01pct$mean[1]),"% ± ",sprintf("%.1f", coverage_01pct$sd[1]),"%, n=",coverage_01pct$n[1],"\n Coverage AD: ",sprintf("%.1f", coverage_01pct$mean[2]),"% ± ",sprintf("%.1f", coverage_01pct$sd[2]),"%, n=",coverage_01pct$n[2], sep="")
+
+coverage_001pct <- ranked_w_metadata %>%
+  filter(relative_abundance >= 0.01 & database=="FL-ASVs") %>%
+  group_by(SeqID,database, Environment) %>%
+  summarize("coverage"=sum(relative_abundance)) %>%
+  group_by(Environment) %>%
+  summarise(mean=mean(coverage), sd=sd(coverage), n=n())
+
+header_001pct <- paste("Relative abundance > 0.01%\n Coverage AS: ",sprintf("%.1f", coverage_001pct$mean[1]),"% ± ",sprintf("%.1f", coverage_001pct$sd[1]),"%, n=",coverage_001pct$n[1],"\n Coverage AD: ",sprintf("%.1f", coverage_001pct$mean[2]),"% ± ",sprintf("%.1f", coverage_001pct$sd[2]),"%, n=",coverage_001pct$n[2], sep="")
+
+coverage_0001pct <- ranked_w_metadata %>%
+  filter(relative_abundance >= 0.001 & database=="FL-ASVs") %>%
+  group_by(SeqID,database, Environment) %>%
+  summarize("coverage"=sum(relative_abundance)) %>%
+  group_by(Environment) %>%
+  summarise(mean=mean(coverage), sd=sd(coverage), n=n())
+
+header_0001pct <- paste("Relative abundance > 0.001%\n Coverage AS: ",sprintf("%.1f", coverage_0001pct$mean[1]),"% ± ",sprintf("%.1f", coverage_0001pct$sd[1]),"%, n=",coverage_0001pct$n[1],"\n Coverage AD: ",sprintf("%.1f", coverage_0001pct$mean[2]),"% ± ",sprintf("%.1f", coverage_0001pct$sd[2]),"%, n=",coverage_0001pct$n[2], sep="")
+```
+
+Prepare data for figures
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+r01 <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.1 & counts>0) %>%
+  group_by(database, Environment) %>%
+  summarize("100%"=sum(Identity==100.0)/n()*100,
+            ">98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            ">94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n(),
+            "Relative_abundance"=header_01pct) %>%
+  gather(3:5, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c(">94.5%",">98.7%","100%")))
+
+r001 <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.01 & counts>0) %>%
+  group_by(database, Environment) %>%
+  summarize("100%"=sum(Identity==100.0)/n()*100,
+            ">98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            ">94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n(),
+            "Relative_abundance"=header_001pct) %>%
+  gather(3:5, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c(">94.5%",">98.7%","100%")))
+
+r0001 <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.001 & counts>0) %>%
+  group_by(database, Environment) %>%
+  summarize("100%"=sum(Identity==100.0)/n()*100,
+            ">98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            ">94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n(),
+            "Relative_abundance"=header_0001pct) %>%
+  gather(3:5, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c(">94.5%",">98.7%","100%")))
+
+r <- rbind(r01,r001,r0001) %>%
+  mutate(Relative_abundance=factor(Relative_abundance, levels=c(header_01pct,header_001pct,header_0001pct)))
+
+top_AD <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.01 & Environment=="Anaerobic digester" & counts>0) %>%
+  group_by(SeqID, Location, database) %>%
+  summarize("ID = 100%"=sum(Identity==100.0)/n()*100,
+            "ID > 98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            "ID > 94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n()) %>%
+  gather(4:6, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c("ID > 94.5%","ID > 98.7%","ID = 100%")))
+
+top_AS <- ranked_w_metadata %>%
+  filter(relative_abundance > 0.01 & Environment=="Activated sludge" & counts>0) %>%
+  group_by(SeqID, Location, database) %>%
+  summarize("ID = 100%"=sum(Identity==100.0)/n()*100,
+            "ID > 98.7%"=(sum(Identity>=98.7)-sum(Identity==100.0))/n()*100,
+            "ID > 94.5%"=(sum(Identity>=94.5)-sum(Identity>=98.7))/n()*100,
+            "detected_amplicons"=n()) %>%
+  gather(4:6, key="temp_Identity", value = "fraction") %>%
+  mutate(Identity=factor(temp_Identity, levels=c("ID > 94.5%","ID > 98.7%","ID = 100%")))
+
+```
+
+## Create figures
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Figure1b <- ggplot(data=r, aes(x=database, y=fraction, fill=Identity)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) +
+  scale_fill_brewer(palette="RdYlBu")+
+     ylab("Percent of ASVs mapped") + 
+  theme(axis.title.x=element_blank()) +
+  facet_grid(Environment~Relative_abundance) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10), expand=c(0,2))
+
+FigureS1a <- ggplot(data=top_AS, aes(x=database, y=fraction, fill=Identity)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent of ASVs with relative abundance higher than 0.01% mapped") + 
+  theme(axis.title.x=element_blank()) +
+  facet_wrap(~Location, ncol = 8) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10))
+
+FigureS1b <- ggplot(data=top_AD, aes(x=database, y=fraction, fill=Identity)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent of ASVs with relative abundance higher than 0.01% mapped") + 
+  theme(axis.title.x=element_blank()) +
+  facet_wrap(~Location, ncol = 8) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10))
+```
+
+## Export figures
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggsave(filename="output/Figure1b.pdf", plot=Figure1b, width=10, height=5, useDingbats=FALSE, limitsize=FALSE)
+
+ggsave(filename="output/FigureS1a.pdf", plot=FigureS1a, width=16, height=length(unique(top_AS$Location))/8*2+2, useDingbats=FALSE, limitsize=FALSE)
+
+ggsave(filename="output/FigureS1b.pdf", plot=FigureS1b, width=16, height=length(unique(top_AD$Location))/8*2+2, useDingbats=FALSE, limitsize=FALSE)
+```

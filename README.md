@@ -1,6 +1,6 @@
 # Publications
 
-## [Dueholm2019a: "Comprehensive ecosystem-specific 16S rRNA gene databases with automated taxonomy assignment (AutoTax) provide species-level resolution in microbial ecology" DOI: 10.1101/672873](https://www.biorxiv.org/content/10.1101/672873v2)
+## [Dueholm2020a: "Generation of Comprehensive Ecosystem-Specific Reference Databases with Species-Level Resolution by High-Throughput Full-Length 16S rRNA Gene Sequencing and Automated Taxonomy Assignment (AutoTax)" DOI: 10.1101/672873](https://www.biorxiv.org/content/10.1101/672873v3)
 * Data availability
   * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJEB26558](https://www.ebi.ac.uk/ena/browser/view/PRJEB26558).
   * RMarkdown files for reproducing the figures are available at GitHub: [Dueholm2019a](https://github.com/msdueholm/Publications/tree/master/Dueholm2019a)

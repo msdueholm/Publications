@@ -1,7 +1,0 @@
-SeqID	WWTP
-AmsterdamWest	AmsterdamWest
-Dokhaven	Dokhaven
-Houtrust	Houtrust
-Kortenoord	Kortenoord
-Kralingseveer	Kralingseveer
-Vianen	Vianen
