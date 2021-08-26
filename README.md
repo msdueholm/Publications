@@ -6,4 +6,13 @@
   * RMarkdown files for reproducing the figures are available at GitHub: [Dueholm2019a](https://github.com/msdueholm/Publications/tree/master/Dueholm2019a)
   * AutoTax processed versions of the SILVA_132_SSURef_Nr99 database in SINTAX and Qiime format  is available at figshare: (https://figshare.com/articles/SILVA_132_NR99_AutoTax/12366620)
   * AutoTax processed versions of the SILVA_138_SSURef_Nr99 database in SINTAX and Qiime format is available at figshare: (https://figshare.com/articles/SILVA_138_NR99_AutoTax/12366626)
-  * AutoTax processed versions of the FL-ASV and FL-OTU expanded databases used in the article in SINTAX and Qiime format is available at figshare: (https://figshare.com/articles/Data_used_in_AutoTax_paper/12377741/1) 
+  * AutoTax processed versions of the FL-ASV and FL-OTU expanded databases used in the article in SINTAX and Qiime format is available at figshare: (https://figshare.com/articles/Data_used_in_AutoTax_paper/12377741/1)
+
+## [Dueholm2021a: "MiDAS 4: A global catalogue of full-length 16S rRNA gene sequences and taxonomy for studies of bacterial communities in wastewater treatment plants" DOI: 10.1101/2021.07.06.451231](https://www.biorxiv.org/content/10.1101/2021.07.06.451231v1)
+* Data availability
+  * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJNA728873](https://www.ebi.ac.uk/ena/browser/view/PRJNA728873).
+  * RMarkdown files for reproducing the figures are available at GitHub: [Dueholm20201a](https://github.com/msdueholm/Publications/tree/master/Dueholm2021a)
+  * Input files for the RMarkdown scripts are available at figshare (update): (https://figshare.com/articles/)
+  * The MiDAS 4 database in SINTAX and Qiime format is available at the MiDAS homepage: (https://midasfieldguide.org/guide/downloads)
+ 
+ 
