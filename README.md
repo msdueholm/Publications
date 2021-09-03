@@ -12,7 +12,7 @@
 * Data availability
   * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJNA728873](https://www.ebi.ac.uk/ena/browser/view/PRJNA728873).
   * RMarkdown files for reproducing the figures are available at GitHub: [Dueholm20201a](https://github.com/msdueholm/Publications/tree/master/Dueholm2021a)
-  * Input files for the RMarkdown scripts are available at figshare (update): (https://figshare.com/articles/)
-  * The MiDAS 4 database in SINTAX and Qiime format is available at the MiDAS homepage: (https://midasfieldguide.org/guide/downloads)
+  * Raw data files for the RMarkdown scripts are available at figshare: (https://doi.org/10.6084/m9.figshare.16566408.v1)
+  * The MiDAS 4 database in SINTAX and QIIME format is available at the MiDAS homepage: (https://midasfieldguide.org/guide/downloads)
  
  
