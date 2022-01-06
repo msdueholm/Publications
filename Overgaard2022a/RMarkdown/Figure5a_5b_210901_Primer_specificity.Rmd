@@ -1,0 +1,117 @@
+---
+title: "Classification of in Silico Amplicons"
+author: "Christina Karmisholt Overgaard"
+date: "5/3/2021"
+output: html_document
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+
+read_amp_classification <- function(input) {
+  map <- read.delim(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+      select(1,4) %>%
+      rename(FLASV = V1) %>%
+      arrange(readr::parse_number(FLASV)) %>%
+      mutate(FLASV = str_replace_all(FLASV, "[:blank:].*", "")) %>%
+      mutate(V4 = str_replace_all(V4, c("d:"), "")) %>%
+      mutate(V4 = str_replace_all(V4, c(",p:"), ",")) %>%
+      mutate(V4 = str_replace_all(V4, c(",c:"), ",")) %>%
+      mutate(V4 = str_replace_all(V4, c(",o:"), ",")) %>%
+      mutate(V4 = str_replace_all(V4, c(",f:"), ",")) %>%
+      mutate(V4 = str_replace_all(V4, c(",g:"), ",")) %>%
+      mutate(V4 = str_replace_all(V4, c(",s:"), ",")) %>%
+      mutate(V4 = gsub("denovo","AsCoM", V4)) %>%
+      separate(V4,sep=",", into = c("ASV_Domain", "ASV_Phylum", "ASV_Class", "ASV_Order", "ASV_Family", "ASV_Genus", "ASV_Species" )) %>%
+      mutate(Amplicon=!!gsub("data/(.+)_vs_AutoTax.sintax", "\\1", paste(input))) %>% separate(Amplicon,sep="-", into = c("Primerset", "Fragment"))}
+
+
+a <- read_amp_classification("data/V57a-Complete_vs_AutoTax.sintax")
+
+# Read reference taxonomy
+Tax_ref <- read.delim("data/tax_complete.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+                      rename(FLASV=1) %>%
+                      arrange(readr::parse_number(FLASV))
+
+# Merge ASV table and mappings
+df1 <- left_join(Tax_ref, a, by="FLASV") %>% replace(.,is.na(.),0)
+
+# Subset ASV table and mappings to Comamonadaceae, Burkholderiaceae, and Oxalobacteraceae
+df2 <- df1 %>%
+  filter(Family %in% c("Comamonadaceae", "Burkholderiaceae", "Oxalobacteraceae"))
+```
+
+Summarize_data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Summary_genera <- df1 %>%
+  summarize("Correct_classification"=sum(Genus==ASV_Genus)/n()*100,
+            "Not_classified"=sum(ASV_Genus=="0")/n()*100,
+            "Wrong_classification"=sum(ASV_Genus!="0" & Genus!=ASV_Genus)/n()*100,
+            "Taxonomic_rank"="Genus") %>%
+  gather(1:3, key="Classification", value="Percentage")
+
+Summary_species <- df1 %>%
+  summarize("Correct_classification"=sum(Species==ASV_Species)/n()*100,
+            "Not_classified"=sum(ASV_Species=="0")/n()*100,
+            "Wrong_classification"=sum(ASV_Species!="0" & Species!=ASV_Species)/n()*100,
+            "Taxonomic_rank"="Species") %>%
+  gather(1:3, key="Classification", value="Percentage")
+
+Summary <- rbind(Summary_genera, Summary_species)
+
+Summary_genera2 <- df2 %>%
+  group_by(Family) %>%
+  summarize("Correct_classification"=sum(Genus==ASV_Genus)/n()*100,
+            "Not_classified"=sum(ASV_Genus=="0")/n()*100,
+            "Wrong_classification"=sum(ASV_Genus!="0" & Genus!=ASV_Genus)/n()*100,
+            "Taxonomic_rank"="Genus") %>%
+  gather(2:4, key="Classification", value="Percentage")
+```
+
+## Plot histogram
+
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+p1 <- ggplot(data=Summary, aes(x=Taxonomic_rank, y=Percentage, fill=Classification)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", position = position_stack(reverse = TRUE), width=0.8) +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1, size = 10, face="bold")) +
+  theme(axis.text.y = element_text(size = 10, face="bold"))+
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent in Silico ASVs") +
+  theme(axis.title.y = element_text(size = 16))+
+  theme(axis.title.x=element_blank()) +
+  theme(strip.text = element_text(size = 15))+scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10))
+
+p2 <- ggplot(data=Summary_genera2, aes(x=Family, y=Percentage, fill=Classification)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity", position = position_stack(reverse = TRUE), width=0.8) +
+  theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1, size = 10, face="bold")) +
+  theme(axis.text.y = element_text(size = 10, face="bold"))+
+  scale_fill_brewer(palette="RdYlBu")+
+  ylab("Percent in Silico ASVs") +
+  theme(axis.title.y = element_text(size = 16))+
+  theme(axis.title.x=element_blank()) +
+  theme(strip.text = element_text(size = 15))+scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10))
+
+
+ggsave(filename="primer_specificity_forward_reverse_reads.pdf", plot=p2, width=10, height=4, useDingbats=FALSE, limitsize=FALSE)
+```

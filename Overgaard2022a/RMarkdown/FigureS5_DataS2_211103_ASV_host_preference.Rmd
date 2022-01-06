@@ -1,0 +1,310 @@
+---
+title: "Figure S5 and Data S2: ASV host preference"
+author: "Christina Overgaard and Morten Dueholm"
+date: "2021-09-17"
+---
+
+```{r}
+library(DESeq2)
+library(tidyverse)
+library(patchwork)
+```
+
+#Load all data
+```{r}
+#Load ASV table
+cts <- read.delim("data/ASVtable.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE, 
+                      row.names=1)
+
+#Converting the ASV table to matrix for import into DESeq2 
+cts=round(as(cts,"matrix"),digits=0)
+
+#Load sample metadata
+coldata <- read.delim("data/Metadata_Askov.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      row.names = "SeqID") 
+
+#Load taxonomy
+tax <- read.delim("data/zotus_vs_AsCoM.sintax",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+    select(c(1,4)) %>%
+    rename(ASV=V1) %>%
+    separate(V4, c("Kingdom","Phylum","Class","Order","Family","Genus","Species"),sep=",") %>%
+    mutate_all(funs(str_replace(., ".:", "")))
+```
+
+#Hordeum vulgare (bulk soil and rhizosphere)
+```{r}
+#Subset sample metadata and add sample and run names for collapsing technical replicates 
+coldata_Hv <- coldata %>% 
+  filter(Compartment %in% c("Soil", "Rhizosphere"), Genotype %in% c("na","Barley")) %>%
+  mutate(Sample = paste(Genotype,Compartment,Bio_rep,sep = "_"))
+
+#Subset and order count matrix based on subsetted metadata
+cts_Hv <- cts[, rownames(coldata_Hv)] #Subset and order count data
+
+# Create DESeqDataSet
+dds_Hv <- DESeqDataSetFromMatrix(cts_Hv, coldata_Hv, ~ Compartment)
+
+#Collapse technical replicates
+dds_Hv_coll <- collapseReplicates(dds_Hv, groupby=dds_Hv$Sample) 
+
+#Set bulk soil as the reference
+dds_Hv_coll$Compartment <- relevel( dds_Hv_coll$Compartment, "Soil" )
+
+#Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution
+dds_Hv_coll=DESeq(dds_Hv_coll) 
+
+#Create MA-plot
+res_Hv1 <- as.data.frame(results(dds_Hv_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  mutate(Enrichment=case_when(padj<0.01 & log2FoldChange>0 ~ "Enriched",
+                              padj<0.01 & log2FoldChange<0 ~ "Reduced",
+                              TRUE ~ "No difference"))
+
+p1<- ggplot(data=res_Hv1,aes(x=baseMean,y=log2FoldChange, color=Enrichment)) + 
+  geom_point()+
+  scale_x_log10()+
+  scale_color_manual(values=c("firebrick3","gray86","deepskyblue3")) +
+  scale_y_continuous(limits = c(-10,10), breaks = c(-10,-8,-6,-4,-2,0, 2,4,6,8,10))+
+  labs(x="Mean abundance",y="Log2 fold change")+ 
+  geom_hline(aes(yintercept = 0), colour = "black", size = 0.5)+
+  theme_bw()+
+  theme(legend.position="none", plot.title = element_text(face="bold.italic"))+
+  ggtitle("Hordeum vulgare")
+
+#Export results to csv 
+res_Hv2 <- as.data.frame(results(dds_Hv_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  merge.data.frame(.,tax, by = "ASV", all.x = TRUE) %>%
+  filter(padj<0.01 & !(is.na(log2FoldChange))) %>%
+  arrange(desc(log2FoldChange))
+
+write.csv(res_Hv2, file = "output/DataS2_Hv.csv",quote = FALSE,row.names = FALSE)
+```
+
+#Zea Mays (bulk soil and rhizosphere)
+```{r}
+#Subset sample metadata and add sample and run names for collapsing technical replicates 
+coldata_Zm <- coldata %>% 
+  filter(Compartment %in% c("Soil", "Rhizosphere"), Genotype %in% c("na","Maize")) %>%
+  mutate(Sample = paste(Genotype,Compartment,Bio_rep,sep = "_"))
+
+#Subset and order count matrix based on subsetted metadata
+cts_Zm <- cts[, rownames(coldata_Zm)] #Subset and order count data
+
+# Create DESeqDataSet
+dds_Zm <- DESeqDataSetFromMatrix(cts_Zm, coldata_Zm, ~ Compartment)
+
+#Collapse technical replicates
+dds_Zm_coll <- collapseReplicates(dds_Zm, groupby=dds_Zm$Sample) 
+
+#Set bulk soil as the reference
+dds_Zm_coll$Compartment <- relevel( dds_Zm_coll$Compartment, "Soil" )
+
+#Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution
+dds_Zm_coll=DESeq(dds_Zm_coll) 
+
+#Create MA-plot
+res_Zm1 <- as.data.frame(results(dds_Zm_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  mutate(Enrichment=case_when(padj<0.01 & log2FoldChange>0 ~ "Enriched",
+                              padj<0.01 & log2FoldChange<0 ~ "Reduced",
+                              TRUE ~ "No difference"))
+
+p2<- ggplot(data=res_Zm1,aes(x=baseMean,y=log2FoldChange, color=Enrichment)) + 
+  geom_point()+
+  scale_x_log10()+
+  scale_color_manual(values=c("firebrick3","gray86","deepskyblue3")) +
+  scale_y_continuous(limits = c(-10,10), breaks = c(-10,-8,-6,-4,-2,0, 2,4,6,8,10))+
+  labs(x="Mean abundance",y="Log2 fold change")+ 
+  geom_hline(aes(yintercept = 0), colour = "black", size = 0.5)+
+  theme_bw()+
+  theme(legend.position="none", plot.title = element_text(face="bold.italic"))+
+  ggtitle("Zea Mays")
+
+#Export results to csv 
+res_Zm2 <- as.data.frame(results(dds_Zm_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  merge.data.frame(.,tax, by = "ASV", all.x = TRUE) %>%
+  filter(padj<0.01 & !(is.na(log2FoldChange))) %>%
+  arrange(desc(log2FoldChange))
+
+write.csv(res_Zm2, file = "output/DataS2_Zm.csv",quote = FALSE,row.names = FALSE)
+```
+
+#Lotus japonica (bulk soil and rhizosphere)
+```{r}
+#Subset sample metadata and add sample and run names for collapsing technical replicates 
+coldata_Lj <- coldata %>% 
+  filter(Compartment %in% c("Soil", "Rhizosphere"), Genotype %in% c("na","Lj")) %>%
+  mutate(Sample = paste(Genotype,Compartment,Bio_rep,sep = "_"))
+
+#Subset and order count matrix based on subsetted metadata
+cts_Lj <- cts[, rownames(coldata_Lj)] #Subset and order count data
+
+# Create DESeqDataSet
+dds_Lj <- DESeqDataSetFromMatrix(cts_Lj, coldata_Lj, ~ Compartment)
+
+#Collapse technical replicates
+dds_Lj_coll <- collapseReplicates(dds_Lj, groupby=dds_Lj$Sample) 
+
+#Set bulk soil as the reference
+dds_Lj_coll$Compartment <- relevel( dds_Lj_coll$Compartment, "Soil" )
+
+#Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution
+dds_Lj_coll=DESeq(dds_Lj_coll) 
+
+#Create MA-plot
+res_Lj1 <- as.data.frame(results(dds_Lj_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  mutate(Enrichment=case_when(padj<0.01 & log2FoldChange>0 ~ "Enriched",
+                              padj<0.01 & log2FoldChange<0 ~ "Reduced",
+                              TRUE ~ "No difference"))
+
+p3<- ggplot(data=res_Lj1,aes(x=baseMean,y=log2FoldChange, color=Enrichment)) + 
+  geom_point()+
+  scale_x_log10()+
+  scale_color_manual(values=c("firebrick3","gray86","deepskyblue3")) +
+  scale_y_continuous(limits = c(-10,10), breaks = c(-10,-8,-6,-4,-2,0, 2,4,6,8,10))+
+  labs(x="Mean abundance",y="Log2 fold change")+ 
+  geom_hline(aes(yintercept = 0), colour = "black", size = 0.5)+
+  theme_bw()+
+  theme(legend.position="none", plot.title = element_text(face="bold.italic"))+
+  ggtitle("Lotus japonica")
+
+#Export results to csv 
+res_Lj2 <- as.data.frame(results(dds_Lj_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  merge.data.frame(.,tax, by = "ASV", all.x = TRUE) %>%
+  filter(padj<0.01 & !(is.na(log2FoldChange))) %>%
+  arrange(desc(log2FoldChange))
+
+write.csv(res_Lj2, file = "output/DataS2_Lj.csv",quote = FALSE,row.names = FALSE)
+```
+
+#Medicargo truncatula (bulk soil and rhizosphere)
+```{r}
+#Subset sample metadata and add sample and run names for collapsing technical replicates 
+coldata_Mt <- coldata %>% 
+  filter(Compartment %in% c("Soil", "Rhizosphere"), Genotype %in% c("na","Mt")) %>%
+  mutate(Sample = paste(Genotype,Compartment,Bio_rep,sep = "_"))
+
+#Subset and order count matrix based on subsetted metadata
+cts_Mt <- cts[, rownames(coldata_Mt)] #Subset and order count data
+
+# Create DESeqDataSet
+dds_Mt <- DESeqDataSetFromMatrix(cts_Mt, coldata_Mt, ~ Compartment)
+
+#Collapse technical replicates
+dds_Mt_coll <- collapseReplicates(dds_Mt, groupby=dds_Mt$Sample) 
+
+#Set bulk soil as the reference
+dds_Mt_coll$Compartment <- relevel( dds_Mt_coll$Compartment, "Soil" )
+
+#Differential expression analysis based on the Negative Binomial (a.k.a. Gamma-Poisson) distribution
+dds_Mt_coll=DESeq(dds_Mt_coll) 
+
+#Create MA-plot
+res_Mt1 <- as.data.frame(results(dds_Mt_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  mutate(Enrichment=case_when(padj<0.01 & log2FoldChange>0 ~ "Enriched",
+                              padj<0.01 & log2FoldChange<0 ~ "Reduced",
+                              TRUE ~ "No difference"))
+
+p4<- ggplot(data=res_Mt1,aes(x=baseMean,y=log2FoldChange, color=Enrichment)) + 
+  geom_point()+
+  scale_x_log10()+
+  scale_color_manual(values=c("firebrick3","gray86","deepskyblue3")) +
+  scale_y_continuous(limits = c(-10,10), breaks = c(-10,-8,-6,-4,-2,0, 2,4,6,8,10))+
+  labs(x="Mean abundance",y="Log2 fold change")+ 
+  geom_hline(aes(yintercept = 0), colour = "black", size = 0.5)+
+  theme_bw()+
+  theme(legend.position="none", plot.title = element_text(face="bold.italic"))+
+  ggtitle("Medicargo truncatula")
+
+#Export results to csv 
+res_Mt2 <- as.data.frame(results(dds_Mt_coll)) %>%
+  mutate(ASV=row.names(.)) %>%
+  merge.data.frame(.,tax, by = "ASV", all.x = TRUE) %>%
+  filter(padj<0.01 & !(is.na(log2FoldChange))) %>%
+  arrange(desc(log2FoldChange))
+
+write.csv(res_Mt2, file = "output/DataS2_Mt.csv",quote = FALSE,row.names = FALSE)
+```
+
+#Export combined figure
+```{r}
+p <- p1+p2+p3+p4+ plot_layout(ncol = 2)
+ggsave(filename="output/FigureS5.pdf", plot=p, width=12, height=8, useDingbats=FALSE, limitsize=FALSE)
+```
+
+#Summaries of enriched taxa
+```{r}
+res_Hv3 <- res_Hv2 %>%
+  filter(log2FoldChange>0) %>%
+  mutate(Plant_species="Hv")
+res_Zm3 <- res_Zm2 %>%
+  filter(log2FoldChange>0) %>%
+  mutate(Plant_species="Zm")
+res_Lj3 <- res_Lj2 %>%
+  filter(log2FoldChange>0) %>%
+  mutate(Plant_species="Lj")
+res_Mt3 <- res_Mt2 %>%
+  filter(log2FoldChange>0) %>%
+  mutate(Plant_species="Mt")
+
+res_merged <- rbind(res_Hv3, res_Zm3, res_Lj3, res_Mt3)
+
+summary_classification <- res_merged %>%
+  group_by(Plant_species) %>%
+  summarize("Species_level"=(n()-sum(is.na(Species)))/n()*100,
+            "Genus_level"=(n()-sum(is.na(Genus)))/n()*100)
+
+summary_family <- res_merged %>%
+  group_by(Plant_species, Family) %>%
+  summarize("ASVs"=n()) %>%
+  spread(key="Plant_species", value="ASVs", fill=0) %>%
+  mutate(Total=Hv+Zm+Lj+Mt)
+
+summary_genera <- res_merged %>%
+  group_by(Plant_species, Genus) %>%
+  summarize("ASVs"=n()) %>%
+  spread(key="Plant_species", value="ASVs", fill=0) %>%
+  mutate(Total=Hv+Zm+Lj+Mt)
+
+
+Heatmap_data <- summary_family %>%
+mutate(Sorting = rowMeans(.[, c(2:5)], na.rm=TRUE)) %>%
+  gather(2:5, key="Plant", value="ASVs") %>%
+  mutate(Family = fct_reorder(Family, Sorting, mean)) %>%
+  mutate(countfactor=cut(ASVs,breaks=c(-1,0,1,10,100,1000),
+                             labels=c("0","1","10","100","1000"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor)))) %>%
+  mutate(Genotype=factor(Plant,levels= c("Hv","Zm","Lj","Mt")))
+
+p1 <- ggplot(Heatmap_data, aes(Plant, Family)) +
+    geom_tile(aes(fill = countfactor)) + 
+    geom_text(aes(label = round(ASVs, 1))) +
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+  scale_fill_manual(values=c("#b30000", "#e34a33","#fc8d59","#fdcc8a","#fef0d9"))
+```

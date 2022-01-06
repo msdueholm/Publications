@@ -1,0 +1,72 @@
+---
+title: "Figure 4: AsCoM vs SILVA heatmap"
+author: "Morten Dueholm"
+date: "2021-09-24"
+---
+
+#Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ampvis2)
+library(data.table)
+library(patchwork)
+library(forcats)
+library(tidyverse)
+```
+
+#Load data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#load metadata
+df_AsCoM <- amp_load(otutab = "data/ASVtable.txt", 
+                taxonomy = "data/zotus_vs_AsCoM.sintax",
+                metadata = "data/Metadata_Askov.txt")
+
+df_SILVA <- amp_load(otutab = "data/ASVtable.txt", 
+                taxonomy = "data/zotus_vs_SILVA.sintax",
+                metadata = "data/Metadata_Askov.txt")
+
+#Subset to rhizosphere samples with at least 10000 reads
+df_AsCoM_n <- amp_subset_samples(df_AsCoM, Compartment=="Rhizosphere", minreads = 10000, normalise = TRUE)
+df_SILVA_n <- amp_subset_samples(df_SILVA, Compartment=="Rhizosphere", minreads = 10000, normalise = TRUE)
+
+```
+
+### Functional groups and filaments
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Create Function to create heatmaps for specific genera
+ASVDataPrep <- function(df) {
+  df <- amp_heatmap(df,
+            group_by = c("Genotype","Bio_rep"),
+            tax_aggregate = "OTU",
+            tax_add = "Species",
+            measure = "mean",
+            tax_show = 50,
+            normalise = FALSE,
+            textmap = TRUE)
+  
+  df2 <- df %>%
+  mutate(ASV = rownames(df)) %>%
+  gather(1:ncol(df), key="Genotype_Biorep", value="RA") %>%
+  separate(Genotype_Biorep, into=c("Genotype","Biorep"), sep=" ") %>%
+  mutate(ASV = fct_reorder(ASV, RA, mean))
+
+p <- ggplot(df2, aes(Biorep, ASV)) +
+    geom_tile(aes(fill = RA)) + 
+    geom_text(aes(label = round(RA, 1))) +
+  facet_wrap(~Genotype, ncol = 4) + 
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_blank()) +
+  #theme(axis.text.x = element_text(angle = 90, vjust=1, hjust=1)) +
+  scale_fill_binned(breaks = c(0.01, 0.1, 1),
+                      limits = c(0, 10),
+                      guide = guide_coloursteps(),
+                      trans = "sqrt")
+p}
+
+p1 <- ASVDataPrep(df_AsCoM_n)
+p2 <- ASVDataPrep(df_SILVA_n)
+
+ggsave(filename="output/Figure4_210924_AsCoM_heatmap.pdf", plot=p1, width=10, height=10, useDingbats=FALSE, limitsize=FALSE)
+ggsave(filename="output/Figure4_210924_SILVA_heatmap.pdf", plot=p2, width=10, height=10, useDingbats=FALSE, limitsize=FALSE)
+```

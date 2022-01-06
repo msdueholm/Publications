@@ -1,0 +1,60 @@
+---
+title: "Figure S4: Heatmaps for Rhizobiales in the rhizosphere and endosphere"
+author: "Christina Overgaard and Morten Dueholm"
+date: "2021-09-17"
+---
+
+#Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ampvis2)
+library(patchwork)
+library(ggpubr)
+library(FSA)
+library(rcompanion)
+library(tidyverse)
+```
+
+#Load data
+```{r MD data}
+#load and order metadata
+df <- amp_load(otutab = "data/ASVtable.txt", 
+                taxonomy = "data/zotus_vs_AsCoM.sintax",
+                metadata = "data/Metadata_Askov.txt")
+```
+#Figure S4
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#prepare rarefied dataset for alpha diversity analysis
+dr <- amp_subset_samples(df, minreads = 10000)
+drs <- amp_subset_taxa(dr, tax_vector = "o__Rhizobiales") 
+
+#Create heatmap data
+Heatmap_data <- amp_heatmap(drs,
+            group_by = c("Genotype","Compartment"),
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 1000,
+            tax_empty = "remove",
+            normalise = TRUE,
+            textmap = TRUE) %>%
+  mutate(Genus = rownames(.)) %>%
+  mutate(Sorting = rowMeans(.[, c(1:10)], na.rm=TRUE)) %>%
+  gather(1:(ncol(.)-2), key="Genotype", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, Sorting, mean)) %>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1%-10%",">10%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor)))) %>%
+  mutate(Genotype=factor(Genotype,levels= c("Barley Rhizosphere","Barley Endosphere","Maize Rhizosphere","Maize Endosphere",
+                                            "Lj Rhizosphere","Lj Endosphere","Lj Nodule","Mt Rhizosphere","Mt Endosphere",
+                                            "Mt Nodule","na Soil")))
+  
+p1 <- ggplot(Heatmap_data, aes(Genotype, Genus)) +
+    geom_tile(aes(fill = countfactor)) + 
+    geom_text(aes(label = round(RA, 1))) +
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+  scale_fill_manual(values=c("#b30000", "#e34a33","#fc8d59","#fdcc8a","#fef0d9"))
+  
+ggsave(filename="output/FigureS4.pdf", plot=p1, width=9, height=10, useDingbats=FALSE, limitsize=FALSE)
+```

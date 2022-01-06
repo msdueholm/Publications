@@ -1,0 +1,113 @@
+---
+title: "Figure X: Alpha-diversity analyses"
+author: "Morten Dueholm"
+date: "2021-09-17"
+---
+
+#Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ampvis2)
+library(patchwork)
+library(ggpubr)
+library(FSA)
+library(rcompanion)
+library(tidyverse)
+```
+
+#Load data
+```{r MD data}
+#load and order metadata
+df <- amp_load(otutab = "data/ASVtable.txt", 
+                taxonomy = "data/zotus_vs_AsCoM.sintax",
+                metadata = "data/Metadata_Askov.txt")
+```
+#Figure S4
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#prepare rarefied dataset for alpha diversity analysis
+dr <- amp_subset_samples(df, rarefy = 10000, minreads = 10000)
+
+#calculate alpha diversity indices
+alpha_all <- amp_alphadiv(dr)  %>%
+  mutate(GenotypeCompartment = str_c(Genotype, Compartment, sep=";"))
+
+alpha_sum <- alpha_all %>%
+  group_by(GenotypeCompartment, Compartment, Genotype, Bio_rep) %>%
+  summarise(ObservedOTUs=mean(ObservedOTUs), invSimpson=mean(invSimpson), n = n()) %>%
+  mutate(GenotypeCompartment=factor(GenotypeCompartment, levels = c("na;Soil","Barley;Rhizosphere","Barley;Endosphere",
+                                                                  "Maize;Rhizosphere","Maize;Endosphere","Lj;Rhizosphere",
+                                                                  "Lj;Endosphere","Lj;Nodule","Mt;Rhizosphere",
+                                                                  "Mt;Endosphere","Mt;Nodule")))
+
+# Select groups for statistical comparison
+p1a <- 
+  ggplot(data = alpha_sum, aes(x = GenotypeCompartment, y = ObservedOTUs, color = Genotype))+
+  theme_bw() +
+  geom_point()+
+  xlab(NULL) +
+  scale_y_continuous("ASV richness", limits = c(0, 4000), n.breaks = 8) +
+  theme(legend.position = "none",
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_blank())
+
+p1b <- 
+  ggplot(data = alpha_sum, aes(x = GenotypeCompartment, y = invSimpson, color = Genotype))+
+  theme_bw() +
+  geom_point()+
+  xlab(NULL) +
+  scale_y_continuous("Inverse Simpsons", limits = c(0, 600), n.breaks=6) +
+  theme(axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black",angle = 90, vjust=0.5, hjust=1))
+
+# PCoA plot (Bray-Curtis diversity)
+p2a <- amp_ordinate(df,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Genotype",
+             sample_shape_by = "Compartment",
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  scale_shape_manual(values=c(1, 2, 5, 6))+
+  theme(axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))
+p2a$layers[[1]]$aes_params$alpha <- 1
+
+p2 <- ((p1a/p1b)|p2a) + plot_layout(widths = c(1, 2))
+ggsave(filename="output/FigureS4.pdf", plot=p2, width=10, height=5, useDingbats=FALSE, limitsize=FALSE)
+```
+
+#Figure 6ab
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#prepare rarefied dataset for alpha diversity analysis
+dr <- amp_subset_samples(df, minreads = 10000)
+dr_rz <- amp_subset_samples(dr, Compartment=="Rhizosphere")
+dr_es <- amp_subset_samples(dr, Compartment=="Endosphere")
+
+# PCoA plot of rhizosphere (Bray-Curtis diversity)
+p3a <- amp_ordinate(dr_rz,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Genotype",
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme(axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))
+p3a$layers[[1]]$aes_params$alpha <- 1
+
+# PCoA plot of rhizosphere (Bray-Curtis diversity)
+p3b <- amp_ordinate(dr_es,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Genotype",
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme(axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"),
+        legend.position = "none")
+p3$layers[[1]]$aes_params$alpha <- 1
+
+p3 <- p3a/p3b
+ggsave(filename="output/Figure6ab.pdf", plot=p3, width=5, height=6, useDingbats=FALSE, limitsize=FALSE)
+```

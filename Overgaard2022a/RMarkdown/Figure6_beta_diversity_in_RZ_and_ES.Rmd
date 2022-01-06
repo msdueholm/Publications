@@ -1,0 +1,123 @@
+---
+title: "Figure 6: Beta-diversity and heatmaps for rhizosphere and endosphere"
+author: "Christina Overgaard and Morten Dueholm"
+date: "2021-09-17"
+---
+
+#Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ampvis2)
+library(patchwork)
+library(ggpubr)
+library(FSA)
+library(rcompanion)
+library(tidyverse)
+```
+
+#Load data
+```{r MD data}
+#load and order metadata
+df <- amp_load(otutab = "data/ASVtable.txt", 
+                taxonomy = "data/zotus_vs_AsCoM.sintax",
+                metadata = "data/Metadata_Askov.txt")
+```
+#Figure 6ab
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#prepare rarefied dataset for alpha diversity analysis
+dr <- amp_subset_samples(df, minreads = 10000)
+dr_rz <- amp_subset_samples(dr, Compartment=="Rhizosphere")
+dr_es <- amp_subset_samples(dr, Compartment=="Endosphere")
+dr_rz2 <- amp_subset_samples(dr, Compartment %in% c("Rhizosphere","Soil"))
+dr_es2 <- amp_subset_samples(dr, Compartment %in% c("Endosphere","Soil"))
+
+# PCoA plot of rhizosphere (Bray-Curtis diversity)
+p1a <- amp_ordinate(dr_rz,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Genotype",
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme(axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"),
+        legend.position = "none")
+p1a$layers[[1]]$aes_params$alpha <- 1
+
+# PCoA plot of rhizosphere (Bray-Curtis diversity)
+p1b <- amp_ordinate(dr_es,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Genotype",
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme(axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))
+p1b$layers[[1]]$aes_params$alpha <- 1
+
+#Create heatmap for the rhizosphere
+Heatmap_data_rz <- amp_heatmap(dr_rz2,
+            group_by = c("Genotype","Bio_rep"),
+            tax_aggregate = "Genus",
+            tax_add = "Class",
+            measure = "mean",
+            tax_show = 20,
+            tax_empty = "empty",
+            normalise = TRUE,
+            textmap = TRUE) %>%
+  mutate(Genus = rownames(.)) %>%
+  mutate(Sorting = rowMeans(.[, c(1:12)], na.rm=TRUE)) %>%
+  gather(1:(ncol(.)-2), key="Genotype", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, Sorting, mean)) %>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1%-10%",">10%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor)))) %>%
+  mutate(Genotype=factor(Genotype,levels= c("Barley 1", "Barley 2", "Barley 3", "Maize 1", "Maize 2", "Maize 3",
+                                            "Lj 1", "Lj 2","Lj 3", "Mt 1", "Mt 2", "Mt 3", "na 1", "na 2", "na 3")))
+  
+    
+p2a <- ggplot(Heatmap_data_rz, aes(Genotype, Genus)) +
+    geom_tile(aes(fill = countfactor)) + 
+    geom_text(aes(label = round(RA, 1))) +
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+  scale_fill_manual(values=c("#b30000", "#e34a33","#fc8d59","#fdcc8a","#fef0d9"))
+  
+#Create heatmap for the endosphere
+Heatmap_data_es <- amp_heatmap(dr_es2,
+            group_by = c("Genotype","Bio_rep"),
+            tax_aggregate = "Genus",
+            tax_add = "Class",
+            measure = "mean",
+            tax_show = 20,
+            tax_empty = "empty",
+            normalise = TRUE,
+            textmap = TRUE) %>%
+  mutate(Genus = rownames(.)) %>%
+  mutate(Sorting = rowMeans(.[, c(1:12)], na.rm=TRUE)) %>%
+  gather(1:(ncol(.)-2), key="Genotype", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, Sorting, mean)) %>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1%-10%",">10%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor)))) %>%
+  mutate(Genotype=factor(Genotype,levels= c("Barley 1", "Barley 2", "Barley 3", "Maize 1", "Maize 2", "Maize 3",
+                                            "Lj 1", "Lj 2","Lj 3", "Mt 1", "Mt 2", "Mt 3", "na 1", "na 2", "na 3")))
+  
+p2b <- ggplot(Heatmap_data_es, aes(Genotype, Genus)) +
+    geom_tile(aes(fill = countfactor)) + 
+    geom_text(aes(label = round(RA, 1))) +
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+  scale_fill_manual(values=c("#b30000", "#e34a33","#fc8d59","#fdcc8a","#fef0d9"))
+
+p1 <- p1a + p1b
+ggsave(filename="output/Figure6a.pdf", plot=p1, width=7, height=3, useDingbats=FALSE, limitsize=FALSE)
+
+p2 <- p2a/p2b
+ggsave(filename="output/Figure6b.pdf", plot=p2, width=12, height=8, useDingbats=FALSE, limitsize=FALSE)
+
+```

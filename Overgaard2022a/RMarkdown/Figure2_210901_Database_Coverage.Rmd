@@ -1,0 +1,145 @@
+---
+title: "Figure 2: Database evaluation based on V5-V7 amplicon mapping"
+author: "cko"
+date: "2021-09-01"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(data.table)
+library(patchwork)
+library(tidyverse)
+```
+
+## Create coverage graphs
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+read_amp_mappings <- function(input) {
+  map <- data.table::fread(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      select = c(1,3))
+  map <- setnames(map, "V1", "ASV")
+  map <- setnames(map, "V3", gsub(".*vs_(.+).b6", "\\1", paste(input)))
+  map <- map[order(, readr::parse_number(ASV))]}
+
+
+a <- read_amp_mappings("data/ASV_vs_AsCoM.b6")
+b <- read_amp_mappings("data/ASV_vs_GG.b6")
+c <- read_amp_mappings("data/ASV_vs_GTDB.b6")
+d <- read_amp_mappings("data/ASV_vs_RDP.b6")
+e <- read_amp_mappings("data/ASV_vs_SILVA.b6")
+
+read_amp_mappings <- function(input) {
+  map <- data.table::fread(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      select = c(1,2))
+  map <- setnames(map, "V1", "ASV")
+  map <- setnames(map, "V2", "Taxonomy")
+  map <- map[order(, readr::parse_number(ASV))]}
+
+# Merge all the mappings into a single data.table, sort it by ASV number, and remove NA's.
+merged_map <- merge.data.table(a, b, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, c, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, d, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, e, by="ASV", all=TRUE)
+merged_map <- merged_map[order(, readr::parse_number(ASV))]
+merged_map[is.na(merged_map)] <- 0
+
+# Read ASV table
+ASVtable <- data.table::fread("data/ASVtable.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df <- merge.data.table(ASVtable, merged_map, by="ASV")
+df <- df[SILVA>60] # Remove unspecific amplicons 
+
+df1 <- df[!grepl("Mitochondria",df$Taxonomy),] # Revome mitochondrial DNA
+df1 <- df1[!grepl("Chloroplast",df1$Taxonomy),] # Revome chloroplast DNA
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long <- melt.data.table(df, id.vars = 1:100, measure.vars = 101:105, variable.name = "Database", value.name = "Identity") 
+df_long <- melt.data.table(df_long, id.vars = c("ASV","Database","Identity"), measure.vars = 2:100, variable.name = "SeqID", value.name = "Counts") 
+df_long <- df_long[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+# Read metadata
+Sample_metadata <- data.table::fread("data/Metadata_Askov.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+
+# Merge metadata with long format data.table
+metadata_merged <- merge.data.table(df_long, Sample_metadata, by="SeqID")
+
+
+# Calculate with coverage of ASVs after subsetting based on relative abundance.
+
+coverage_001pct <-metadata_merged[Rel_abun >= 0.01, .("coverage"=sum(Rel_abun)), by=.(SeqID,Database,Compartment)][,.(mean=mean(coverage),sd=sd(coverage),n=.N), by=.(Compartment,Database)]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+
+r001_soil <- metadata_merged[Rel_abun>0.01 & Counts>0 & Compartment=="Soil", .("Hits"=sum(Identity>=99)/.N*100,
+   "detected_amplicons"=.N,
+   "Cutoff"="001",
+   "Relative_abundance"=paste("Soil \n Coverage: ",round(coverage_001pct$mean[1],digits = 2),"% ± ",round(coverage_001pct$sd[1], digits = 2),"%, n=", coverage_001pct$n[1],sep="")), by=.(Compartment,Database,SeqID)]
+
+
+r001_rhizo <- metadata_merged[Rel_abun>0.01 & Counts>0 & Compartment=="Rhizosphere", .("Hits"=sum(Identity>=99)/.N*100,
+   "detected_amplicons"=.N,
+   "Cutoff"="001",
+   "Relative_abundance"=paste("Rhizopshere \n Coverage: ",round(coverage_001pct$mean[13],digits = 2),"% ± ",round(coverage_001pct$sd[13], digits = 2),"%, n=", coverage_001pct$n[13],sep="")), by=.(Compartment,Database,SeqID)]
+
+r001_endo <- metadata_merged[Rel_abun>0.01 & Counts>0 & Compartment=="Endosphere", .("Hits"=sum(Identity>=99)/.N*100,
+   "detected_amplicons"=.N,
+   "Cutoff"="001",
+   "Relative_abundance"=paste("Endosphere \n Coverage: ",round(coverage_001pct$mean[7],digits = 2),"% ± ",round(coverage_001pct$sd[7], digits = 2),"%, n=", coverage_001pct$n[7],sep="")), by=.(Compartment,Database,SeqID)]
+
+r <- rbindlist(list(r001_soil,r001_rhizo,r001_endo))
+
+r <- r[ !(Compartment %in% "Nodule")]
+
+# Rearrange and format data
+r <- r[, Database:=factor(Database, levels=c("AsCoM","GG","GTDB","RDP","SILVA"))]
+
+r <- r[, Relative_abundance:=factor(Relative_abundance, levels=c(r001_soil$Relative_abundance[1],r001_rhizo$Relative_abundance[1],r001_endo$Relative_abundance[1]))]
+                                                       
+r <- setkey(r, Hits)
+
+r$Compartment_f = factor(r$Compartment, levels=c("Soil","Rhizosphere","Endosphere"))
+
+## Plot histogram
+a <- ifelse(r$Database == "AsCoM", "darkred", "black")
+
+p1 <- ggplot(data=r, aes(x=Database, y=Hits, fill=Database)) +
+  theme_bw() +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1, fill="white")+
+  ylab("Percent of ASVs with \n high-identity references (>99% ID)") +
+  scale_fill_brewer(palette="RdYlBu")+
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(legend.position = "none") +
+  facet_wrap(Compartment_f~Relative_abundance) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1, colour = a))
+  
+ggsave(filename="output/Figure2_Coverage.pdf", plot=p1, width=7, height=3, useDingbats=FALSE, limitsize=FALSE)
+```

@@ -1,0 +1,193 @@
+---
+title: "Figure 1: Phylogenetic trees"
+author: "cko"
+date: "2021-09-01"
+---
+  
+  #Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(ggtree)
+library(patchwork)
+```
+
+#Load data - bacteria 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#load metadata
+seqid_metadata <- read.csv("data/tax_SILVA.csv", sep=",", header = TRUE)
+tax_metadata <- read.csv("data/tax_complete.csv", sep=",", header = TRUE)
+
+#load tree
+tree_bacteria <- read.tree(file = "data/bacteria_newick2.tree")
+tree_archaea <- read.tree(file = "data/archaea_newick.tree")
+```
+
+#Create metadata for bacterial and archaeal SeqID trees
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+New_phylum <- (seqid_metadata %>%
+  filter(idty<75) %>%
+  select(FLASV))$FLASV
+
+New_class <- (seqid_metadata %>%
+  filter(idty<78.5 & idty >= 75) %>%
+  select(FLASV))$FLASV
+
+New_order <- (seqid_metadata %>%
+  filter(idty<82 & idty >= 78.5) %>%
+  select(FLASV))$FLASV
+
+New_family <- (seqid_metadata %>%
+  filter(idty<86.5 & idty >= 82) %>%
+  select(FLASV))$FLASV
+
+New_genus <- (seqid_metadata %>%
+  filter(idty<94.5 & idty >= 86.5) %>%
+  select(FLASV))$FLASV
+
+New_species <- (seqid_metadata %>%
+  filter(idty<98.7 & idty >= 94.5) %>%
+  select(FLASV))$FLASV
+
+Known <- (seqid_metadata %>%
+  filter(idty >= 98.7) %>%
+  select(FLASV))$FLASV
+
+groupInfo1 <- list(New_phylum = New_phylum, New_class = New_class, New_order = New_order,
+                  New_family = New_family, New_genus = New_genus, New_species = New_species,
+                  Known = Known)
+```
+
+#Create metadata for bacterial and archaeal TaxNovelty trees
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+New_phylum2 <- (tax_metadata %>%
+  filter(grepl("AsCoM",Phylum)) %>%
+  select(FLASV))$FLASV
+
+New_class2 <- (tax_metadata %>%
+  filter(grepl("AsCoM",Class) & !(grepl("AsCoM",Phylum))) %>%
+  select(FLASV))$FLASV
+
+New_order2 <- (tax_metadata %>%
+  filter(grepl("AsCoM",Order) & !(grepl("AsCoM",Class))) %>%
+  select(FLASV))$FLASV
+
+New_family2 <- (tax_metadata %>%
+  filter(grepl("AsCoM",Family) & !(grepl("AsCoM",Order))) %>%
+  select(FLASV))$FLASV
+
+New_genus2 <- (tax_metadata %>%
+  filter(grepl("AsCoM",Genus) & !(grepl("AsCoM",Family))) %>%
+  select(FLASV))$FLASV
+
+New_species2 <- (tax_metadata %>%
+  filter(grepl("AsCoM",Species) & !(grepl("AsCoM",Genus))) %>%
+  select(FLASV))$FLASV
+
+Known_species2 <- (tax_metadata %>%
+  filter(!(grepl("AsCoM",Species))) %>%
+  select(FLASV))$FLASV
+
+groupInfo2 <- list(New_phylum = New_phylum2, New_class = New_class2, New_order = New_order2,
+                  New_family = New_family2, New_genus = New_genus2, New_species = New_species2,
+                  Known_species = Known_species2)
+```
+
+#Create metadata for bacterial Taxonomy tree (Top 8 phyla)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+Proteobacteria <- (tax_metadata %>%
+  filter(grepl("Proteobacteria",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Bacteroidota  <- (tax_metadata %>%
+  filter(grepl("Bacteroidota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Acidobacteriota <- (tax_metadata %>%
+  filter(grepl("Acidobacteriota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Myxococcota <- (tax_metadata %>%
+  filter(grepl("Myxococcota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Chloroflexi <- (tax_metadata %>%
+  filter(grepl("Chloroflexi",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Actinobacteriota <- (tax_metadata %>%
+  filter(grepl("Actinobacteriota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+
+Planctomycetota <- (tax_metadata %>%
+  filter(grepl("Planctomycetota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Patescibacteria  <- (tax_metadata %>%
+  filter(grepl("Patescibacteria",Phylum)) %>%
+  select(FLASV))$FLASV
+
+groupInfo3 <- list(Proteobacteria = Proteobacteria, 
+                   Bacteroidota = Bacteroidota, 
+                   Acidobacteriota = Acidobacteriota,
+                   Myxococcota = Myxococcota,
+                   Chloroflexi = Chloroflexi,
+                   Actinobacteriota = Actinobacteriota,
+                   Planctomycetota = Planctomycetota,
+                   Patescibacteria = Patescibacteria)
+```
+
+#Create metadata for archaeal Taxonomy tree
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Phyla
+Aenigmarchaeota <- (tax_metadata %>%
+  filter(grepl("Aenigmarchaeota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Crenarchaeota  <- (tax_metadata %>%
+  filter(grepl("Crenarchaeota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Nanoarchaeota <- (tax_metadata %>%
+  filter(grepl("Nanoarchaeota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+Thermoplasmatota <- (tax_metadata %>%
+  filter(grepl("Thermoplasmatota",Phylum)) %>%
+  select(FLASV))$FLASV
+
+
+groupInfo4 <- list(Crenarchaeota = Crenarchaeota, 
+                   Thermoplasmatota = Thermoplasmatota, 
+                   Aenigmarchaeota = Aenigmarchaeota, 
+                   Nanoarchaeota = Nanoarchaeota)
+
+
+```
+
+#Create trees
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#load tree
+tree1 <- groupOTU(tree_bacteria, groupInfo1)
+p1 <- ggtree(tree1, aes(color=group), layout='circular')
+
+tree2 <- groupOTU(tree_bacteria, groupInfo2)
+p2 <- ggtree(tree2, aes(color=group), layout='circular')
+
+tree3 <- groupOTU(tree_bacteria, groupInfo3)
+p3 <- ggtree(tree3, aes(color=group), layout='circular')
+
+tree4 <- groupOTU(tree_archaea, groupInfo1)
+p4 <- ggtree(tree4, aes(color=group), layout='circular')
+
+tree5 <- groupOTU(tree_archaea, groupInfo2)
+p5 <- ggtree(tree5, aes(color=group), layout='circular')
+
+tree6 <- groupOTU(tree_archaea, groupInfo4)
+p6 <- ggtree(tree6, aes(color=group), layout='circular')
+
+p <- p1 + p2 + p3 + p4 + p5 + p6 + plot_layout(ncol=3, heights = c(2,1))
+
+ggsave(filename="output/Figure1_Trees.pdf", plot=p, width=40, height=20, useDingbats=FALSE, limitsize=FALSE)
+```
+
