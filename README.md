@@ -10,7 +10,7 @@
 
 ## [Dueholm2021a: "MiDAS 4: A global catalogue of full-length 16S rRNA gene sequences and taxonomy for studies of bacterial communities in wastewater treatment plants" DOI: 10.1101/2021.07.06.451231](https://www.biorxiv.org/content/10.1101/2021.07.06.451231v1)
 * Data availability
-  * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJNA728873](https://www.ebi.ac.uk/ena/browser/view/PRJNA728873).
+  * The raw sequencing data is available at the NCBI SRA database with BioProject ID: [PRJNA728873](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA728873).
   * RMarkdown files for reproducing the figures are available at GitHub: [Dueholm2022a](https://github.com/msdueholm/Publications/tree/master/Dueholm2022a)
   * Raw data files for the RMarkdown scripts are available at figshare: (https://doi.org/10.6084/m9.figshare.16566408.v1)
   * The MiDAS 4 database in SINTAX and QIIME format is available at the MiDAS homepage: (https://midasfieldguide.org/guide/downloads)
