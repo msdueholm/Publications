@@ -8,7 +8,7 @@
   * AutoTax processed versions of the SILVA_138_SSURef_Nr99 database in SINTAX and Qiime format is available at figshare: (https://figshare.com/articles/SILVA_138_NR99_AutoTax/12366626)
   * AutoTax processed versions of the FL-ASV and FL-OTU expanded databases used in the article in SINTAX and Qiime format is available at figshare: (https://figshare.com/articles/Data_used_in_AutoTax_paper/12377741/1)
 
-## [Dueholm2021a: "MiDAS 4: A global catalogue of full-length 16S rRNA gene sequences and taxonomy for studies of bacterial communities in wastewater treatment plants" DOI: 10.1101/2021.07.06.451231](https://www.biorxiv.org/content/10.1101/2021.07.06.451231v1)
+## [Dueholm2022a: "MiDAS 4: A global catalogue of full-length 16S rRNA gene sequences and taxonomy for studies of bacterial communities in wastewater treatment plants" DOI: 10.1038/s41467-022-29438-7](https://www.nature.com/articles/s41467-022-29438-7)
 * Data availability
   * The raw and assembled sequencing data is available at the NCBI SRA database with BioProject ID: [PRJNA728873](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA728873).
   * RMarkdown files for reproducing the figures are available at GitHub: [Dueholm2022a](https://github.com/msdueholm/Publications/tree/master/Dueholm2022a)
@@ -21,3 +21,7 @@
   * RMarkdown files including raw data for reproducing the figures are available at GitHub: [Overgaard2022a](https://github.com/msdueholm/Publications/tree/master/Overgaard2022a/RMarkdown)
   * The AsCoM database v1.0 in SINTAX and QIIME format is available at figshare at GitHub: [Overgaard2022a](https://github.com/msdueholm/Publications/tree/master/Overgaard2022a/AsCoM)
 
+## Dueholm2022b: "Genetic potential for exopolysaccharide synthesis in activated sludge bacteria uncovered by genome-resolved metagenomics"
+* Data availability
+  * R-scripts for reproducing the figures are available at GitHub: [Dueholm2022b](https://github.com/msdueholm/Publications/tree/master/Dueholm2022b)
+  * Raw data files for the R-scripts are available at figshare: (https://doi.org/10.6084/m9.figshare.21287112.v1)
