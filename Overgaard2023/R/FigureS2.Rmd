@@ -1,0 +1,166 @@
+---
+title: "FigureS2"
+author: "CKO and MKDD"
+date: '2023-09-17'
+output: html_document
+---
+#Load packages
+```{r}
+library(tidyverse)
+library(ggtree)
+library(aplot)
+```
+
+#Load data
+```{r setup, include=FALSE}
+# Load the mappings 
+map <- data.table::fread("data/EUK_mock_mappings.b6",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+        rename(Query = V1, Target = V2) %>%
+        rename(Mismatches = V5, Gaps = V6) %>%
+        mutate(Differences = Mismatches + Gaps) %>% # Multiply the number of mismatches and gaps to find the total number of differences 
+        select(Query, Target, Differences) # Select only the relevant columns 
+
+map <- map[order(, readr::parse_number(Query))]
+
+# Devide the data into ranges of differences
+map2 <- map %>% mutate(Differences2 = ifelse(Differences > 19 & Differences < 201, 200,
+                       ifelse(Differences > 200 & Differences < 501, 500,
+                       ifelse(Differences > 500 & Differences < 601, 600,
+                       ifelse(Differences > 600 & Differences < 701, 700,
+                       ifelse(Differences > 700 & Differences < 801, 800,
+                       ifelse(Differences > 800 & Differences < 901, 900,
+                       ifelse(Differences > 900 & Differences < 1001, 1000,
+                      ifelse(Differences > 1000 & Differences < 1501, 1500,
+                      ifelse(Differences > 1500,  1501, Differences)))))))))) 
+```
+
+# Make heatmap
+```{r}
+#Set colors for the heatmap
+colors <-  c("#FFFFFF","#fcfdbf","#fc8c63","#ea5661","#993366","#7c2382","#5c167f","#4c117a","#3b0f70","#29115a","#1a1042","#0e0b2b","#000004")
+
+# Make heatmap showing the number of differences between the Clones in the mock community
+p1 <- ggplot(data = map2, mapping = aes(x = Query, y = Target, fill = Differences)) + 
+            geom_tile(width=1) + 
+            #theme_tufte(base_family="Helvetica") +
+            theme(axis.text.x = element_text(angle = 90, 
+                                            vjust = 0.5, 
+                                            hjust=10)) +
+            binned_scale(aesthetics = "fill", scale_name = "custom", 
+                        palette = ggplot2:::binned_pal(scales::manual_pal(values = colors)),
+                        guide = "bins",
+                        breaks = c(0,1,2,5,50,200,500,1000,1500),
+                        name = "Number of differences", 
+                        labels = c("0","1","2","3-5","6-50","51-200","201-500","501-1000","1001-1500")) +
+            guides(fill = guide_legend(byrow = T)) +
+            geom_text(data = subset(map2, Differences < 10), aes(label = Differences), color = "Black",size = 6/ggplot2::.pt) + 
+            theme(axis.title = element_blank()) +
+  theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+            
+```
+
+
+```{r}
+data_SD <- read.delim("data/EUK_mock_headers.tsv",
+                   sep =  ";",
+                   header = T) %>%
+        select(c(ID,Subdivision))
+
+data_Class <- read.delim("data/EUK_mock_headers.tsv",
+                   sep =  ";",
+                   header = T) %>%
+        select(c(ID,Class))
+
+## First replace group names such that "group_X" is replaced by "group"
+## For aesthetic reasons
+data_SD$Subdivision <-gsub("Chlorophyta_X","Chlorophyta",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Streptophyta_X","Streptophyta",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Tubulinea_X","Tubulinea",as.character(data_SD$Subdivision))
+
+
+## Order data based on Supergroup, then Division and then Subdivision
+## This is so that when you plot the bargraph, all the alveolates are grouped together etc. 
+data_SD <- data_SD[with(data_SD, order(Subdivision)),]
+
+## Replace names with common names (Subdivision)
+data_SD$Subdivision <-gsub("Apicomplexa","Apicomplexans",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Cercozoa","Cercozoans",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Chlorophyta","Chlorophytes",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Ciliophora","Ciliates",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Gyrista","Gyristans",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Metazoa","Metazoans",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Streptophyta","Streptophytes",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Tubulinea","Other",as.character(data_SD$Subdivision))
+data_SD$Subdivision <-gsub("Ichthyosporea","Other",as.character(data_SD$Subdivision))
+
+data_SD$Subdivision <- as.character(data_SD$Subdivision)
+
+data_SD$Subdivision <- as.factor(data_SD$Subdivision)
+
+data_SD$Subdivision <- factor(data_SD$Subdivision, levels = c("Chlorophytes", "Streptophytes", "Fungi", "Metazoans", "Apicomplexans", "Ciliates", "Cercozoans", "Gyristans", "Other"))
+
+datad_SD <- gather(data_SD, Subdivision, key='Rank', value='Classification')
+
+p2 <- ggplot(datad_SD, 
+             aes(x = Rank,
+                 y = ID,
+                 fill = Classification)) + 
+  geom_tile() + 
+  geom_text(aes(label = Classification), color = "black", size = 6/ggplot2::.pt) +
+  scale_y_discrete(position="right") +
+  theme_minimal() + 
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank()) +
+  xlab(NULL) + 
+  ylab(NULL) +
+  scale_fill_brewer(palette = "Set3", name="") +
+  theme(axis.text.y=element_blank(), 
+        axis.ticks.y=element_blank())+
+  theme(text=element_text(size=6, colour = "black"),
+           #axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+```
+
+# Make dendrogram
+```{r}
+#Load tree file 
+tree <- read.tree(file = "data/EUK_mock.tree")
+
+#Make the dendrogram
+p_tree <- ggtree(tree) + 
+          #geom_tiplab(as_ylab = TRUE) +
+          theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+          #xlim(-2, 3)
+
+p_treeH <- ggtree(tree) + 
+           layout_dendrogram() + 
+           #geom_tiplab(as_xlab = TRUE) +
+           theme(text=element_text(size=6, colour = "black"),
+            axis.text = element_text(size = 6, colour = "black"),
+            axis.title = element_text(size = 6, face = "bold", colour = "black"),
+            legend.text = element_text(size = 6, colour = "black"),
+            legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+p3 <- p1 %>% insert_left(p2, width = 0.2)%>% insert_left(p_tree, width = 0.2) %>% insert_bottom(p_treeH, height = 0)
+```
+
+#Export the figure as PDF
+```{r}
+ggsave(filename="output/figureS2.pdf", plot=p3, width=240, height=180, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```

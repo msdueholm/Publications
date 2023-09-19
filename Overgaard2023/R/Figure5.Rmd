@@ -1,0 +1,98 @@
+---
+title: "Figure5"
+author: "CKO and MJ"
+date: "2023-03-29"
+output: html_document
+---
+
+# Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ggtree)
+library(tidyverse)
+library(ggstar)
+library(ggnewscale)
+```
+
+
+## Load tree
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#load tree
+tree <- read.tree(file = "data/RAxML_bestTree.all.concat.rooted.tre")
+
+# load metadata
+meta <- read.delim("data/metadata_fig6.tsv",
+                   sep = "\t",
+                   header = FALSE) %>%
+            rename("ID" = V1,
+                   "Perc_id" = V2)
+```
+
+
+## get internal node numbers for clades we want to label
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# TSAR
+## Cercozoa
+MRCA(tree, .node1 = c('uniq397_TSAR_Rhizaria_Cercozoa', 'uniq1414_TSAR_Rhizaria_Cercozoa')) 
+## Gyrista
+MRCA(tree, .node1 = c('uniq4374_TSAR_Stramenopiles_Gyrista', 'uniq4187_TSAR_Stramenopiles_Gyrista'))
+## Bigyra
+MRCA(tree, .node1 = c('uniq1821_TSAR_Stramenopiles_Bigyra', 'uniq3100_TSAR_Stramenopiles_Bigyra')) 
+## Ciliophora
+MRCA(tree, .node1 = c('uniq2542_TSAR_Alveolata_Ciliophora', 'uniq4912_TSAR_Alveolata_Ciliophora')) 
+## Apicomplexa
+MRCA(tree, .node1 = c('uniq3271_TSAR_Alveolata_Apicomplexa', 'uniq4161_TSAR_Alveolata_Apicomplexa'))
+## TSAR
+MRCA(tree, .node1 = c('uniq397_TSAR_Rhizaria_Cercozoa', 'uniq2432_TSAR_Telonemia_TelonemiaX')) 
+
+
+# Archaeplastida
+## Chlorophyta
+MRCA(tree, .node1 = c('uniq966_Archaeplastida_Chlorophyta_ChlorophytaX', 'uniq2819_Archaeplastida_Chlorophyta_ChlorophytaX'))
+## Archaeplastida
+MRCA(tree, .node1 = c('uniq966_Archaeplastida_Chlorophyta_ChlorophytaX', 'uniq2967_Archaeplastida_Rhodelphea_RhodelpheaX')) 
+
+# Excavata
+## Discoba
+MRCA(tree, .node1 = c('uniq1480_Excavata_Discoba_DiscobaX', 'uniq2518_Excavata_Discoba_DiscobaX')) 
+
+# Amoebozoa
+## Tubulinea
+MRCA(tree, .node1 = c('uniq1721_Amoebozoa_Tubulinea_TubulineaX', 'uniq4665_Amoebozoa_Tubulinea_TubulineaX')) 
+## Evosea
+MRCA(tree, .node1 = c('uniq3815_Amoebozoa_Evosea_EvoseaX', 'uniq3877_Amoebozoa_Evosea_EvoseaX')) 
+## Amoebozoa
+MRCA(tree, .node1 = c('uniq1721_Amoebozoa_Tubulinea_TubulineaX', 'uniq3877_Amoebozoa_Evosea_EvoseaX')) 
+
+# Obazoa
+## Fungi
+MRCA(tree, .node1 = c('uniq3676_Obazoa_Opisthokonta_Fungi', 'uniq1986_Obazoa_Opisthokonta_Fungi')) 
+## Metazoa
+MRCA(tree, .node1 = c('uniq2454_Obazoa_Opisthokonta_Metazoa', 'uniq1803_Obazoa_Opisthokonta_Metazoa')) 
+## Obazoa
+MRCA(tree, .node1 = c('uniq3676_Obazoa_Opisthokonta_Fungi', 'uniq3730_Obazoa_Breviatea_BreviateaX')) 
+```
+
+
+## plot
+```{r}
+p <- ggtree(tree, layout='fan', open.angle = 10) +
+      xlim(-2, NA) + 
+      geom_hilight(node = 6932, fill='#8dd3c7', alpha=0.3) + ## Cercozoa
+      geom_hilight(node = 8934, fill="#ffffb3", alpha=0.3) + ## Gyrista
+      geom_hilight(node = 8763, fill="#bebada", alpha=0.3) + ## Bigyra
+      geom_hilight(node = 9492, fill="#fb8072", alpha=0.3) + ## Ciliophora
+      geom_hilight(node = 9313, fill="#80b1d3", alpha=0.3) + ## Apicomplexa
+      geom_hilight(node = 6465, fill="#fdb462", alpha=0.3) + ## Chlorophyta
+      geom_hilight(node = 6337, fill="#b3de69", alpha=0.3) + ## Discoba
+      geom_hilight(node = 9815, fill="#fccde5", alpha=0.3) + ## Tubulinea
+      geom_hilight(node = 9987, fill="#d9d9d9", alpha=0.3) + ## Evosea
+      geom_hilight(node = 5204, fill="#bc80bd", alpha=0.3) + ## Fungi
+      geom_hilight(node = 5060, fill="#ccebc5", alpha=0.3)   ## Metazoa
+
+```
+
+## Export the plot
+```{r}
+ggsave(filename="output/Figure5.pdf", plot=p, width=169, height=169, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+

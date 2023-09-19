@@ -1,0 +1,1 @@
+cat input.fa| paste - - | perl -ne 'chomp; s/^>/@/; @v = split /\t/; printf("%s\n%s\n+\n%s\n", $v[0], $v[1], "("x length($v[1]))' > output.fq

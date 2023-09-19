@@ -1,0 +1,94 @@
+---
+title: "Figure3"
+author: "CKO and MKDD"
+date: "2023-09-17"
+output: html_document
+---
+#Load packages
+```{r}
+library(ggplot2)
+library(patchwork)
+```
+#Import data
+```{r}
+data1 <- read.delim("data/detected_and_correct_ASVs.csv",
+                 sep = ",",
+                 header = TRUE, 
+                 quote = "\"",
+                 fill = TRUE,
+                 check.names =FALSE,
+                 stringsAsFactors = TRUE)
+
+data2 <- read.delim("data/wet_lab_ASVs_reads.csv",
+                 sep = ",",
+                 header = TRUE, 
+                 quote = "\"",
+                 fill = TRUE,
+                 check.names =FALSE,
+                 stringsAsFactors = TRUE)
+```
+
+# Make stacked bar plots 
+```{r}
+p1 <- ggplot(data2, 
+       aes(y=Taxa, 
+           x=Method)) + 
+    geom_bar(stat="identity", fill = "#80B1D3") +
+  theme_bw() +
+  geom_hline(yintercept=41, 
+             linetype="dashed", 
+             color = "black",
+             linewidth = 0.5) + 
+  scale_y_continuous(name="Number of taxa observed") +
+  theme(axis.title.x=element_blank())+
+  theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+```
+
+
+```{r}
+data1$Category <- factor(data1$Category, levels=c("Noisy ASVs", "Error-free ASVs")) 
+data1$Software <- factor(data1$Software, levels=c("Uchime3", "Unoise3", "DADA2"))
+
+line <- data.frame(Method = c("PacBio", "UMI", "UMI_clonal"), Z = c(40, 21, 32))
+
+p2 <- ggplot(data1, 
+       aes(fill=Category, 
+           y=ASVs, 
+           x=Software)) + 
+    geom_bar(position="stack", 
+             stat="identity") + 
+  scale_fill_manual(values=c('#F7BDC1','#80B1D3')) +
+  theme_bw() +
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(name="Number of ASVs resolved", 
+                     breaks = seq(0, 110, 
+                     by = 10)) +
+  facet_wrap(~ Method, strip.position = "bottom") +
+  theme(strip.background = element_blank(),
+        strip.placement = "outside") + 
+  geom_abline(data = line, 
+              aes(intercept = Z, 
+                  slope = 0), 
+              linetype = 2, 
+              size = 0.5) +
+  theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+```
+
+# Combine the two barplots
+```{r}
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(1,4))
+```
+
+Export the plot
+```{r}
+ggsave(filename="output/Figure3.pdf", plot=p, width=169, height=50, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+
+

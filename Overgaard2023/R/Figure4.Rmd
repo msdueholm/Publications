@@ -1,0 +1,53 @@
+---
+title: "Figure4"
+author: "CKO and MKDD"
+date: "2023-09-17"
+output: html_document
+---
+
+#Load packages
+```{r}
+library(ggplot2)
+```
+
+#Load data
+```{r}
+data <- read.delim("data/generate_and_detected_chimeras.csv",
+                 sep = ",",
+                 header = TRUE, 
+                 quote = "\"",
+                 fill = TRUE,
+                 check.names =FALSE,
+                 stringsAsFactors = TRUE)
+```
+
+# Make stacked bar plot 
+```{r}
+data$Category <- factor(data$Category, levels=c("Generated chimeras", "Detected chimeras")) 
+data$Software <- factor(data$Software, levels=c("Uchime3", "Unoise3", "DADA2"))
+
+p1 <- ggplot(data, 
+       aes(fill=Category, 
+           y=Chimeras, 
+           x=Software)) + 
+    geom_bar(position="dodge", 
+             stat="identity") + 
+  scale_fill_manual(values=c('#F7BDC1','#80B1D3')) +
+  theme_bw() +
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(name="Number of chimeras", 
+                     breaks = seq(0, 110, 
+                                  by = 10)) +
+  facet_wrap(~ Method, strip.position = "bottom") +
+  theme(strip.background = element_blank(),
+        strip.placement = "outside") +
+  theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+```
+
+Export the plot
+```{r}
+ggsave(filename="output/Figure4.pdf", plot=p1, width=169, height=50, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```

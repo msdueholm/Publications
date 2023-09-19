@@ -1,0 +1,82 @@
+---
+title: "FigureS4"
+author: "CKO and MKDD"
+date: "2023-09-17"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+```
+
+#Load data
+```{r}
+PacBio <- read.delim("data/PacBio_ASV_table.txt") %>%
+        rename(barcode= X.OTU.ID) %>%
+        rename(Number_of_sequences = seq)
+
+UMI <- read.delim("data/UMI_ASV_table.txt") %>%
+        rename(barcode= X.OTU.ID) %>%
+        rename(Number_of_sequences = seq)
+
+UMI_clonal <- read.delim("data/UMI_clonal_ASV_table.txt") %>%
+        rename(barcode= X.OTU.ID) %>%
+        rename(Number_of_sequences = seq)
+```
+
+#Plot for PacBio data 
+```{r}
+p1 <- ggplot(PacBio, aes(x=barcode, y=Number_of_sequences)) + 
+      geom_bar(stat = "identity", fill = "#80B1D3") +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+      geom_text(aes(label=Number_of_sequences), position=position_dodge(width=0.9), vjust=-0.25,size = 6/ggplot2::.pt)+ 
+      theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black")) +
+      ylab("Number of sequences") +
+      theme(axis.title.x = element_blank())
+```
+
+#Plot for UMI data
+```{r}
+p2 <- ggplot(UMI, aes(x=barcode, y=Number_of_sequences)) + 
+      geom_bar(stat = "identity", fill = "#80B1D3") +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+      geom_text(aes(label=Number_of_sequences), position=position_dodge(width=0.9), vjust=-0.25,size = 6/ggplot2::.pt)+ 
+      theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black")) +
+      ylab("Number of sequences") + 
+      theme(axis.title.x = element_blank())
+```
+
+#Plot for UMI clonal data
+```{r}
+p3 <- ggplot(UMI_clonal, aes(x=barcode, y=Number_of_sequences)) + 
+      geom_bar(stat = "identity", fill = "#80B1D3") +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+      geom_text(aes(label=Number_of_sequences), position=position_dodge(width=0.9), vjust=-0.25,size = 6/ggplot2::.pt) + 
+      theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black")) +
+      ylab("Number of sequences") + 
+      theme(axis.title.x = element_blank())
+```
+
+# Combine the three plots
+```{r}
+p <- p1/p2/p3
+```
+
+# Export plot
+```{r}
+ggsave("output/FigureS4.pdf", plot=p, width=169, height=120, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
