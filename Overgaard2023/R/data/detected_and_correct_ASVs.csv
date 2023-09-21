@@ -1,0 +1,19 @@
+Method,Software,Category,ASVs
+PacBio,Uchime3,Error-free ASVs,35
+PacBio,Uchime3,Noisy ASVs,2
+PacBio,Unoise3,Error-free ASVs,36
+PacBio,Unoise3,Noisy ASVs,2
+PacBio,DADA2,Error-free ASVs,35
+PacBio,DADA2,Noisy ASVs,69
+UMI,Uchime3,Error-free ASVs,6
+UMI,Uchime3,Noisy ASVs,2
+UMI,Unoise3,Error-free ASVs,7
+UMI,Unoise3,Noisy ASVs,2
+UMI,DADA2,Error-free ASVs,6
+UMI,DADA2,Noisy ASVs,58
+UMI_clonal,Uchime3,Error-free ASVs,23
+UMI_clonal,Uchime3,Noisy ASVs,4
+UMI_clonal,Unoise3,Error-free ASVs,24
+UMI_clonal,Unoise3,Noisy ASVs,4
+UMI_clonal,DADA2,Error-free ASVs,22
+UMI_clonal,DADA2,Noisy ASVs,80
