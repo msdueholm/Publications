@@ -28,6 +28,5 @@
 
 ## [Overgaard2023: "Benchmarking long-read sequencing strategies for obtaining ASV-resolved rRNA operons from environmental microeukaryotes"](https://github.com/msdueholm/Publications/tree/master/Overgaard2023)
 * Data availability
-  * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJNAxxxx](https://www.ebi.ac.uk/ena/browser/view/PRJNAxxxx).
+  * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJNA1019781](https://www.ebi.ac.uk/ena/browser/view/PRJNA1019781).
   * RMarkdown files including raw data for reproducing the figures are available at GitHub: [Overgaard2023](https://github.com/msdueholm/Publications/tree/master/Overgaard2023)
-  * Raw data files for the R-scripts are available at figshare: (https://doi.org/10.6084/m9.figshare.xxxxx.v1)
