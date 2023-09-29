@@ -1,0 +1,161 @@
+---
+title: "Figure 3: Primer coverage"
+author: "Morten K. D. Dueholm"
+date: "2022-05-02"
+---
+  
+  #Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(tidyverse)
+library(ggtree)
+library(patchwork)
+```
+
+#Load data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#load metadata
+tax_metadata <- read.csv("data/tax_complete.csv", sep=",", header = TRUE)
+
+# Read primer mapping results
+read_primerbias <- function(input) {
+  map <- read.delim(input,
+                      sep = ",",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      skip=12) %>%
+    select(1,10) %>%
+    rename(FLASV = "V1") %>%
+    arrange(readr::parse_number(FLASV)) %>%
+    mutate(Primer_id=gsub("data/primerbias/(.+)_MiDAS5_FLASVs_uppercase_hits.txt", "\\1", paste(input))) %>%
+    mutate(V10=as.numeric(V10))}
+
+file_list <- list.files("data/primerbias/", full.names=TRUE)
+
+for (file in file_list){
+  
+# if the merged dataset doesn't exist, create it
+
+  if (!exists("dataset")){
+    dataset <- read_primerbias(file)
+  }
+  
+  # if the merged dataset does exist, append to it
+
+  if (exists("dataset")){
+    temp_dataset <-read_primerbias(file)
+    dataset<-rbind(dataset, temp_dataset)
+    rm(temp_dataset)
+  } 
+
+}
+
+primer_metadata <- read.csv("data/All_primers_meta_trimmed.txt", sep="\t", header = TRUE)
+```
+
+## Summarize_data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# Filter primers with primer binding sites outside region covered
+
+df <- dataset %>%
+  filter(Primer_id %in% primer_metadata$Primer_id) %>%
+  merge.data.frame(., primer_metadata, by="Primer_id") %>%
+  merge.data.frame(., tax_metadata, by="FLASV")
+
+Summary <- df %>%
+  group_by(FLASV,Kingdom, Phylum,Class,Order,Family,Genus,Species,Target_site,Domain,type) %>%
+  summarize("Match"=if_else(max(V10)==0, "Perfect", if_else(max(V10)>1, "Poor", "Partial"))) %>%
+  mutate("Kingdom_Phylum"=str_c(Kingdom,Phylum,sep=";"))
+
+#Create data for figure 
+Summary2 <- Summary %>%
+  group_by(Kingdom,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  mutate(Coverage2=cut(Coverage,breaks=c(-1,0,40,80,99.99,100),
+                             labels=c("0%","0-40%","40-80%","80-100%","100%"))) %>%
+  mutate(Coverage2=factor(as.character(Coverage2),levels=rev(levels(Coverage2)))) %>%
+  filter(Kingdom %in% c("Bacteria","Archaea")) %>%
+  rename(Tax=Kingdom)
+
+Summary2_bac <- Summary %>%
+  filter(Kingdom=="Bacteria") %>%
+  filter(Phylum %in% c("Proteobacteria","Firmicutes","Bacteroidota","Chloroflexi","Patescibacteria",
+                       "Actinobacteriota","Planctomycetota","Myxococcota","Desulfobacterota","Verrucomicrobiota",
+                       "Bdellovibrionota","Acidobacteriota","Spirochaetota","Armatimonadota","Synergistota",
+                       "Cyanobacteria","Cloacimonadota","Campylobacterota","Dependentiae","Nitrospirota")) %>%
+  mutate(Phylum=str_c("Bacteria;",Phylum)) %>%
+  group_by(Phylum,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  mutate(Coverage2=cut(Coverage,breaks=c(-1,0,40,80,99.99,100),
+                             labels=c("0%","0-40%","40-80%","80-100%","100%"))) %>%
+  mutate(Coverage2=factor(as.character(Coverage2),levels=rev(levels(Coverage2))))  %>%
+  rename(Tax=Phylum)
+  
+
+Summary2_arc <- Summary %>%
+  filter(Kingdom=="Archaea") %>%
+  mutate(Phylum=str_c("Archaea;",Phylum)) %>%
+  group_by(Phylum,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  mutate(Coverage2=cut(Coverage,breaks=c(-1,0,40,80,99.99,100),
+                             labels=c("0%","0-40%","40-80%","80-100%","100%"))) %>%
+  mutate(Coverage2=factor(as.character(Coverage2),levels=rev(levels(Coverage2))))  %>%
+  rename(Tax=Phylum)
+
+Summary2_merged <- merge.data.frame(Summary2, Summary2_bac, all = TRUE) %>%
+  merge.data.frame(., Summary2_arc, all = TRUE)  %>%
+  mutate(Tax=factor(as.factor(Tax),levels=rev(levels(as.factor(Tax)))))
+
+p <- ggplot(Summary2_merged, aes(Target_site, Tax)) +
+     geom_tile(aes(fill = Coverage2)) + 
+     geom_text(aes(label = round(Coverage, 0))) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+    #facet_wrap(~Domain,  drop=TRUE, scales = "free") +
+    scale_fill_manual(values=c("#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde"))
+
+ggsave(filename="output/Figure3_Primerbias.pdf", plot=p, width=10, height=6, useDingbats=FALSE, limitsize=FALSE)
+
+
+#Create summary tables for different taxonomic ranks
+Summary_table_species <- Summary %>%
+  group_by(Kingdom, Phylum, Class, Order, Family, Genus, Species, Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  spread(Target_site, Coverage)
+
+Summary_table_genus <- Summary %>%
+  group_by(Kingdom, Phylum, Class, Order, Family, Genus,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  spread(Target_site, Coverage)
+
+Summary_table_family <- Summary %>%
+  group_by(Kingdom, Phylum, Class, Order, Family,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  spread(Target_site, Coverage)
+
+Summary_table_order <- Summary %>%
+  group_by(Kingdom, Phylum, Class, Order,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  spread(Target_site, Coverage)
+
+Summary_table_class <- Summary %>%
+  group_by(Kingdom, Phylum, Class,Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  spread(Target_site, Coverage)
+
+Summary_table_phylum <- Summary %>%
+  group_by(Kingdom, Phylum, Target_site) %>%
+  summarize("Coverage"=sum(Match=="Perfect")/n()*100) %>%
+  spread(Target_site, Coverage)
+
+write.csv(Summary_table_species, file="output/Primerbias_species.csv", row.names=FALSE, quote=FALSE)
+write.csv(Summary_table_genus, file="output/Primerbias_genus.csv", row.names=FALSE, quote=FALSE)
+write.csv(Summary_table_family, file="output/Primerbias_family.csv", row.names=FALSE, quote=FALSE)
+write.csv(Summary_table_order, file="output/Primerbias_order.csv", row.names=FALSE, quote=FALSE)
+write.csv(Summary_table_class, file="output/Primerbias_class.csv", row.names=FALSE, quote=FALSE)
+write.csv(Summary_table_phylum, file="output/Primerbias_phylum.csv", row.names=FALSE, quote=FALSE)
+```

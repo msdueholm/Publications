@@ -1,0 +1,52 @@
+---
+title: "Table 2: Taxonomy novelty compared to MiDAS 4.8.1"
+author: "Morten K. D. Dueholm"
+date: "2022-04-05"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+df1 <- read.delim("data/tax_complete.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+  gather(2:8, key="tax_rank", value = "tax") %>%
+  mutate(tax_rank=factor(tax_rank, levels=c("Kingdom","Phylum","Class","Order","Family","Genus","Species"))) %>%
+  mutate(new = tax %in% df2$tax)
+
+
+# Read taxonomy results from MiDAS4.8.1
+df2 <- read.delim("data/tax_complete_midas4.8.1.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE) %>%
+  gather(2:8, key="tax_rank", value = "tax") %>%
+  mutate(tax_rank=factor(tax_rank, levels=c("Kingdom","Phylum","Class","Order","Family","Genus","Species")))
+
+```
+
+# Novelty Calculations
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Novelty <- df1 %>%
+  group_by(tax_rank) %>%
+  summarize("Total_taxa"=n_distinct(tax, na.rm = TRUE),
+            "New_taxa"=n_distinct(tax[!(tax %in% df2$tax)] ,na.rm = TRUE),
+            "Percent_increase" = round(New_taxa/(Total_taxa-New_taxa)*100,1))
+```
+
+#Export
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+write_csv(Novelty, "output/Table2_Taxonomy_novelty_vs_MiDAS4.8.1.csv")
+```

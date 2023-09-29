@@ -1,0 +1,91 @@
+---
+title: "Table 1: Sequence novelty"
+author: "Morten K. D. Dueholm"
+date: "2022-04-04"
+---
+
+# Load packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read mapping results
+df1 <- read.delim("data/tax_SILVA.txt",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = TRUE)
+
+df2 <- read.delim("data/tax_MiDAS4.8.1.txt",
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = TRUE)
+
+# Read taxonomy results from MiDAS4.8.1 (used for subsetting)
+df3 <- read.delim("data/tax_complete_midas4.8.1.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+```
+
+# Novelty Calculations
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# Remove FLASVs alreade found in MiDAS 4
+df1_trimmed <- filter(df1, !(V1 %in% df3$FLASV))
+df2_trimmed <- filter(df2, !(V1 %in% df3$FLASV))
+
+# Against SILVA138.1_SSURef_NR99
+Novelty_counts1 <- df1_trimmed %>% summarize("Calc"="Counts",
+            "New_species"=sum(V3<98.7),
+            "New_genera"=sum(V3<94.5),
+            "New_families"=sum(V3<86.5),
+            "New_orders"=sum(V3<82),
+            "New_classes"=sum(V3<78.5),
+            "New_phyla"=sum(V3<75))
+
+Novelty_percent1 <- df1_trimmed %>% summarize("Calc"="Percentage",
+            "New_species"=str_c(round(sum(V3<98.7)/n()*100,2),"%"),
+            "New_genera"=str_c(round(sum(V3<94.5)/n()*100,2),"%"),
+            "New_families"=str_c(round(sum(V3<86.5)/n()*100,2),"%"),
+            "New_orders"=str_c(round(sum(V3<82)/n()*100,2),"%"),
+            "New_classes"=str_c(round(sum(V3<78.5)/n()*100,2),"%"),
+            "New_phyla"=str_c(round(sum(V3<75)/n()*100,2),"%"))
+
+Novelty1 <- rbind(Novelty_counts1,Novelty_percent1)
+
+# Against MiDAS4.8.1
+Novelty_counts2 <- df2_trimmed %>% summarize("Calc"="Counts",
+            "New_species"=sum(V3<98.7),
+            "New_genera"=sum(V3<94.5),
+            "New_families"=sum(V3<86.5),
+            "New_orders"=sum(V3<82),
+            "New_classes"=sum(V3<78.5),
+            "New_phyla"=sum(V3<75))
+
+Novelty_percent2 <- df2_trimmed %>% summarize("Calc"="Percentage",
+            "New_species"=str_c(round(sum(V3<98.7)/n()*100,2),"%"),
+            "New_genera"=str_c(round(sum(V3<94.5)/n()*100,2),"%"),
+            "New_families"=str_c(round(sum(V3<86.5)/n()*100,2),"%"),
+            "New_orders"=str_c(round(sum(V3<82)/n()*100,2),"%"),
+            "New_classes"=str_c(round(sum(V3<78.5)/n()*100,2),"%"),
+            "New_phyla"=str_c(round(sum(V3<75)/n()*100,2),"%"))
+
+Novelty2 <- rbind(Novelty_counts2,Novelty_percent2)
+
+```
+
+#Export
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+write_csv(Novelty1, "output/Table1_Sequence_novelty_vs_SILVA138.1_SSURef_NR99.csv")
+write_csv(Novelty2, "output/Table1_Sequence_novelty_vs_MiDAS4.8.1.csv")
+```

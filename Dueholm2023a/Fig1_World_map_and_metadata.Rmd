@@ -1,0 +1,140 @@
+---
+title: "Figure 1: World map and WWTP metadata"
+author: "Morten K. D. Dueholm"
+date: "2022-04-01"
+---
+
+# Load packages
+```{r setup, include=FALSE}
+library(tidyverse)
+library(maps)
+library(patchwork)
+```
+
+# Load data
+```{r message=FALSE, warning=TRUE, include=FALSE}
+df <- read.csv("data/DataS1_AD_metadata_220401.txt", sep="\t")
+df[df==""]<-NA
+df <- mutate(df, Primary_substrate = fct_other(Primary_substrate, keep = c("Food waste","Industrial","Manure","Wastewater sludge", "Other")))
+df$Primary_substrate[is.na(df$Primary_substrate)] <- "Other"
+df$Temperature_range[is.na(df$Temperature_range)] <- "Other"
+df <- mutate(df, AD_id = str_extract(SampleID, pattern = "[A-Z,2]{2,3}-[0-9]{2}"))
+```
+
+# Create worldmap and plot the ADs colored by continent 
+```{r}
+mp <- NULL
+mapWorld <- borders("world", colour = "#333333", fill="#DAD7C5")
+mp <- ggplot() + mapWorld
+
+mp1 <- mp + geom_point(data = df,aes(x=Longitude, y=Latitude, colour = Continent), size=2) +
+  scale_color_brewer(palette = "Set2")
+
+ggsave(filename="output/Figure1a_Continent.pdf", plot=mp1, width=10, height=5, useDingbats=FALSE, limitsize=FALSE)
+```
+
+# Create summary for worldmap
+```{r}
+Summary1 <- df %>%
+  group_by(Continent) %>%
+  summarize("Countries"=n_distinct(Country, na.rm = TRUE),
+            "Cities"=n_distinct(City, na.rm = TRUE),
+            "Digesters"=n_distinct(AD_id, na.rm = TRUE))
+```
+
+# Create summary for digester technology and primary substrate
+```{r}
+Summary_Technology <- df %>%
+  replace_na(list(Digester_technology="Other")) %>%
+  group_by(Digester_technology) %>%
+  summarize("Counts"=n_distinct(AD_id, na.rm = TRUE),
+            "Percent"=n_distinct(AD_id, na.rm = TRUE)/n_distinct(df$AD_id, na.rm = TRUE)*100) %>%
+  mutate(Digester_technology=reorder(Digester_technology, Counts)) %>%
+  mutate(Digester_technology=relevel(Digester_technology, "Other"))
+
+Summary_Primary_substrate <- df %>%
+  group_by(Primary_substrate) %>%
+  summarize("Counts"=n_distinct(AD_id, na.rm = TRUE),
+            "Percent"=n_distinct(AD_id, na.rm = TRUE)/n_distinct(df$AD_id, na.rm = TRUE)*100)  %>%
+  mutate(Primary_substrate=reorder(Primary_substrate, Counts)) %>%
+  mutate(Primary_substrate=relevel(Primary_substrate, "Other"))
+
+Summary_Temperature_range <- df %>%
+  group_by(Temperature_range) %>%
+  summarize("Counts"=n_distinct(AD_id, na.rm = TRUE),
+            "Percent"=n_distinct(AD_id, na.rm = TRUE)/n_distinct(df$AD_id, na.rm = TRUE)*100)  %>%
+  mutate(Temperature_range=reorder(Temperature_range, Counts)) %>%
+  mutate(Temperature_range=relevel(Temperature_range, "Other"))
+```
+
+# Make bar plots
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+p1 <- ggplot(Summary_Primary_substrate, aes(x=Primary_substrate, y=Percent)) +
+  theme_bw() +
+  geom_bar(color="black", stat="identity",position = "identity", width=0.8, fill="#66c2a5") +
+  geom_text(aes(x=Primary_substrate, y=Percent+5, label=Counts)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  ylab("Primary substrate (%)") +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(axis.title.y=element_blank())+
+  theme(legend.position = "none") +
+  coord_flip()
+
+p2 <- ggplot(Summary_Technology, aes(x=Digester_technology, y=Percent)) +
+  theme_bw() +
+  geom_bar(color="black", stat="identity",position = "identity", width=0.8, fill="#fc8d62") +
+  geom_text(aes(x=Digester_technology, y=Percent+5, label=Counts)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  ylab("Digester technolgy (%)") +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(axis.title.y=element_blank())+
+  theme(legend.position = "none") +
+  coord_flip()
+
+p3 <- ggplot(Summary_Temperature_range, aes(x=Temperature_range, y=Percent)) +
+  theme_bw() +
+  geom_bar(color="black", stat="identity",position = "identity", width=0.8, fill="#8da0cb") +
+  geom_text(aes(x=Temperature_range, y=Percent+5, label=Counts)) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  ylab("Temperature range (%)") +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(axis.title.y=element_blank())+
+  theme(legend.position = "none") +
+  coord_flip()
+
+p <- p1 + p2 + p3 + plot_spacer() + plot_layout(ncol=2)
+
+ggsave(filename="output/Figure1b.pdf", plot=p, width=10, height=4, useDingbats=FALSE, limitsize=FALSE)
+```
+
+# Create summary for ammonium concentrations
+```{r}
+Summary_Ammonium <- df %>%
+  filter(!(is.na(Ammonium))) %>%
+  group_by(Primary_substrate) %>%
+  summarize("Mean"=mean(Ammonium),
+            "StDev"=sd(Ammonium),
+            "Median"=median(Ammonium),
+            "IQR"=IQR(Ammonium),
+            "n"=n())
+
+Summary_SRT <- df %>%
+  filter(!(is.na(SRT))) %>%
+  group_by(Primary_substrate) %>%
+  summarize("Mean"=mean(SRT),
+            "StDev"=sd(SRT),
+            "Median"=median(SRT),
+            "IQR"=IQR(SRT),
+            "n"=n())
+
+Summary_Temp<- df %>%
+  filter(!(is.na(Temperature))) %>%
+  group_by(Primary_substrate) %>%
+  summarize("Mean"=mean(Temperature),
+            "StDev"=sd(Temperature),
+            "Median"=median(Temperature),
+            "IQR"=IQR(Temperature),
+            "n"=n())
+
+
+```

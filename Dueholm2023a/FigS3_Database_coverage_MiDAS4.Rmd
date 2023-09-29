@@ -1,0 +1,575 @@
+---
+title: "Figure 2: MiDAS5 database evaluation"
+author: "Morten K. D. Dueholm"
+date: "2022-04-05"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(data.table)
+library(tidyverse)
+library(patchwork)
+```
+
+## Create coverage graphs
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+### Function to load read mapping data
+read_amp_mappings <- function(input) {
+  map <- data.table::fread(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      select = c(1,3))
+  map <- setnames(map, "V1", "ASV")
+  map <- setnames(map, "V3", gsub(".*vs_(.+).b6", "\\1", paste(input)))
+  map <- map[order(, readr::parse_number(ASV))]}
+
+### Read mapping results for V1-V3
+a <- read_amp_mappings("data/MiDAS4_V13ASV_vs_GTDB_ssu_r202.b6")
+b <- read_amp_mappings("data/MiDAS4_V13ASV_vs_SILVA_138.1_SSURef_NR99.b6")
+c <- read_amp_mappings("data/MiDAS4_V13ASV_vs_MiDAS_4.8.1.b6")
+d <- read_amp_mappings("data/MiDAS4_V13ASV_vs_MiDAS_5.0.b6")
+
+# Merge all the mappings into a single data.table, sort it by ASV number, and remove NA's.
+merged_map <- merge.data.table(a, b, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, c, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, d, by="ASV", all=TRUE)
+merged_map <- merged_map[order(, readr::parse_number(ASV))]
+merged_map[is.na(merged_map)] <- 0
+
+# Read ASV table
+ASVtable <- data.table::fread("data/MiDAS4_V13_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df <- merge.data.table(ASVtable, merged_map, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long <- melt.data.table(df, id.vars = 1:ncol(ASVtable), measure.vars = (ncol(ASVtable)+1):(ncol(ASVtable)+ncol(merged_map)-1), variable.name = "Database", value.name = "Identity") 
+df_long <- melt.data.table(df_long, id.vars = c("ASV","Database","Identity"), measure.vars = 2:ncol(ASVtable), variable.name = "SeqID", value.name = "Counts") 
+df_long <- df_long[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+# Calculate with coverage of ASVs after subsetting based on relative abundance (>= 0.01).
+coverage_v13 <-df_long[Rel_abun >= 0.01, .("coverage"=sum(Rel_abun)), by=.(SeqID,Database)][,.(mean=mean(coverage),sd=sd(coverage),n=.N), by=Database]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+r_V13 <- df_long[Rel_abun>0.01 & Counts>0, .("Hits"=sum(Identity>=99)/.N*100,
+            "detected_amplicons"=.N),
+            by=.(Database,SeqID)][,Primer:="V1-V3 (MiDAS 4)"]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+Summary_V13 <- r_V13[, .("Mean"=mean(Hits),
+                  "Sd"=sd(Hits)), 
+              by=.(Database)][,Primer:="V1-V3 (MiDAS 4)"]
+
+### Read mapping results for V4
+a <- read_amp_mappings("data/MiDAS4_V4ASV_vs_GTDB_ssu_r202.b6")
+b <- read_amp_mappings("data/MiDAS4_V4ASV_vs_SILVA_138.1_SSURef_NR99.b6")
+c <- read_amp_mappings("data/MiDAS4_V4ASV_vs_MiDAS_4.8.1.b6")
+d <- read_amp_mappings("data/MiDAS4_V4ASV_vs_MiDAS_5.0.b6")
+
+# Merge all the mappings into a single data.table, sort it by ASV number, and remove NA's.
+merged_map <- merge.data.table(a, b, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, c, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, d, by="ASV", all=TRUE)
+merged_map <- merged_map[order(, readr::parse_number(ASV))]
+merged_map[is.na(merged_map)] <- 0
+
+# Read ASV table
+ASVtable <- data.table::fread("data/MiDAS4_V4_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df <- merge.data.table(ASVtable, merged_map, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long <- melt.data.table(df, id.vars = 1:ncol(ASVtable), measure.vars = (ncol(ASVtable)+1):(ncol(ASVtable)+ncol(merged_map)-1), variable.name = "Database", value.name = "Identity") 
+df_long <- melt.data.table(df_long, id.vars = c("ASV","Database","Identity"), measure.vars = 2:ncol(ASVtable), variable.name = "SeqID", value.name = "Counts") 
+df_long <- df_long[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+# Calculate with coverage of ASVs after subsetting based on relative abundance (>= 0.01).
+coverage_v4 <-df_long[Rel_abun >= 0.01, .("coverage"=sum(Rel_abun)), by=.(SeqID,Database)][,.(mean=mean(coverage),sd=sd(coverage),n=.N), by=Database]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+r_V4 <- df_long[Rel_abun>0.01 & Counts>0, .("Hits"=sum(Identity>=99)/.N*100,
+            "detected_amplicons"=.N),
+            by=.(Database,SeqID)][,Primer:="V4 (MiDAS 4)"]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+Summary_V4 <- r_V4[, .("Mean"=mean(Hits),
+                  "Sd"=sd(Hits)), 
+              by=.(Database)][,Primer:="V4 (MiDAS 4)"]
+
+### Read mapping results for V4 GWMC
+a <- read_amp_mappings("data/GWMC_ASV_vs_GTDB_ssu_r202.b6")
+b <- read_amp_mappings("data/GWMC_ASV_vs_SILVA_138.1_SSURef_NR99.b6")
+c <- read_amp_mappings("data/GWMC_ASV_vs_MiDAS_4.8.1.b6")
+d <- read_amp_mappings("data/GWMC_ASV_vs_MiDAS_5.0.b6")
+
+# Merge all the mappings into a single data.table, sort it by ASV number, and remove NA's.
+merged_map <- merge.data.table(a, b, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, c, by="ASV", all=TRUE)
+merged_map <- merge.data.table(merged_map, d, by="ASV", all=TRUE)
+merged_map <- merged_map[order(, readr::parse_number(ASV))]
+merged_map[is.na(merged_map)] <- 0
+
+# Read ASV table
+ASVtable <- data.table::fread("data/GWMC_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df <- merge.data.table(ASVtable, merged_map, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long <- melt.data.table(df, id.vars = 1:ncol(ASVtable), measure.vars = (ncol(ASVtable)+1):(ncol(ASVtable)+ncol(merged_map)-1), variable.name = "Database", value.name = "Identity") 
+df_long <- melt.data.table(df_long, id.vars = c("ASV","Database","Identity"), measure.vars = 2:ncol(ASVtable), variable.name = "SeqID", value.name = "Counts") 
+df_long <- df_long[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+# Calculate with coverage of ASVs after subsetting based on relative abundance (>= 0.01).
+coverage_GWMC <-df_long[Rel_abun >= 0.01, .("coverage"=sum(Rel_abun)), by=.(SeqID,Database)][,.(mean=mean(coverage),sd=sd(coverage),n=.N), by=Database]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+r_GWMC <- df_long[Rel_abun>0.01 & Counts>0, .("Hits"=sum(Identity>=99)/.N*100,
+            "detected_amplicons"=.N),
+            by=.(Database,SeqID)][,Primer:="V4 (GWMC)"]
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+Summary_GWMC <- r_GWMC[, .("Mean"=mean(Hits),
+                  "Sd"=sd(Hits)), 
+              by=.(Database)][,Primer:="V4 (GWMC)"]
+
+#Combine summary
+Summary <- rbind(Summary_V13, Summary_V4)
+Summary <- rbind(Summary, Summary_GWMC)
+
+#Combine mapping results
+r <- rbind(r_V13, r_V4)
+r <- rbind(r, r_GWMC)
+r <- r[, Primer:=factor(Primer, levels=c("V1-V3 (MiDAS 4)","V4 (MiDAS 4)","V4 (GWMC)"))]
+
+## Plot histogram
+p1 <- ggplot(data=r, aes(x=Database, y=Hits, fill=Database)) +
+  theme_bw() +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1, fill="white")+
+  ylab("Percent of ASVs with high-identity references (>99% ID)") +
+  scale_fill_brewer(palette="Set2")+
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(legend.position = "none") +
+  facet_grid(~Primer) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
+
+rm(df, df_long, a,b,c,d,e,f,g,merged_map,r,r0001,r001,r01)
+```
+
+## Create classification graphs for genera
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Function for importing and arranging classifications
+read_amp_classifications <- function(input) {
+  map <- data.table::fread(input,
+                      sep = "\t",
+                      header = FALSE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE,
+                      select = c(1,4))
+  map <- setnames(map, "V1", "ASV")
+  map <- map[, Database:=gsub(".*vs_(.+).sintax", "\\1", paste(input))]
+  map <- map[order(, readr::parse_number(ASV))]}
+
+### V1-V3
+# Read classifications 
+a2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_GTDB_ssu_r202.sintax")
+b2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_SILVA_138.1_SSURef_NR99.sintax")
+c2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_MiDAS_4.8.1.sintax")
+d2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_MiDAS_5.0.sintax")
+
+#Merge data into one data-table
+merged_map2 <- rbind.data.frame(a2,b2,c2,d2)
+
+#Separate the taxonomy in ranks
+merged_map2 <- merged_map2[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+
+#Remove unused columns
+merged_map2 <- merged_map2[,V4:=NULL]
+merged_map2 <- merged_map2[,K:=NULL]
+merged_map2 <- merged_map2[,P:=NULL]
+merged_map2 <- merged_map2[,C:=NULL]
+merged_map2 <- merged_map2[,O:=NULL]
+merged_map2 <- merged_map2[,F:=NULL]
+merged_map2 <- merged_map2[,S:=NULL]
+
+# Read ASV table
+ASVtable <- data.table::fread("data/MiDAS4_V13_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and classification
+df2 <- merge.data.table(ASVtable, merged_map2, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long2 <- melt.data.table(df2, id.vars = c(1,(ncol(df2)-1):(ncol(df2))), measure.vars = 2:(ncol(df2)-2), variable.name = "SeqID", value.name = "Counts") 
+
+df_long2 <- df_long2[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+#Summarize data
+#Calculate fraction of ASVs classified at the genus level in the reference databases
+rc_V13 <- df_long2[Rel_abun>0.01 & Counts>0, .("Classified"=(.N-sum(is.na(G)))/.N*100,
+            "detected_amplicons"=.N), by=.(Database,SeqID)][,Primer:="V1-V3 (MiDAS 4)"]
+
+#Calculate fraction of ASVs with genus level classification in the reference databases
+Summary2_V13 <- rc_V13[,.("Mean"=mean(Classified),
+            "Stdev"=sd(Classified)),
+            by=.(Database)][,Primer:="V1-V3 (MiDAS 4)"]
+
+### V4
+# Read classifications 
+a2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_GTDB_ssu_r202.sintax")
+b2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_SILVA_138.1_SSURef_NR99.sintax")
+c2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_MiDAS_4.8.1.sintax")
+d2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_MiDAS_5.0.sintax")
+
+#Merge data into one data-table
+merged_map2 <- rbind.data.frame(a2,b2,c2,d2)
+
+#Separate the taxonomy in ranks
+merged_map2 <- merged_map2[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+
+#Remove unused columns
+merged_map2 <- merged_map2[,V4:=NULL]
+merged_map2 <- merged_map2[,K:=NULL]
+merged_map2 <- merged_map2[,P:=NULL]
+merged_map2 <- merged_map2[,C:=NULL]
+merged_map2 <- merged_map2[,O:=NULL]
+merged_map2 <- merged_map2[,F:=NULL]
+merged_map2 <- merged_map2[,S:=NULL]
+
+# Read ASV table
+ASVtable <- data.table::fread("data/MiDAS4_V4_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and classification
+df2 <- merge.data.table(ASVtable, merged_map2, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long2 <- melt.data.table(df2, id.vars = c(1,(ncol(df2)-1):(ncol(df2))), measure.vars = 2:(ncol(df2)-2), variable.name = "SeqID", value.name = "Counts") 
+
+df_long2 <- df_long2[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+#Summarize data
+#Calculate fraction of ASVs classified at the genus level in the reference databases
+rc_V4 <- df_long2[Rel_abun>0.01 & Counts>0, .("Classified"=(.N-sum(is.na(G)))/.N*100,
+            "detected_amplicons"=.N), by=.(Database,SeqID)][,Primer:="V4 (MiDAS 4)"]
+
+#Calculate fraction of ASVs with genus level classification in the reference databases
+Summary2_V4 <- rc_V4[,.("Mean"=mean(Classified),
+            "Stdev"=sd(Classified)),
+            by=.(Database)][,Primer:="V4 (MiDAS 4)"]
+
+### V4 GWMC
+# Read classifications 
+a2 <- read_amp_classifications("data/GWMC_ASV_vs_GTDB_ssu_r202.sintax")
+b2 <- read_amp_classifications("data/GWMC_ASV_vs_SILVA_138.1_SSURef_NR99.sintax")
+c2 <- read_amp_classifications("data/GWMC_ASV_vs_MiDAS_4.8.1.sintax")
+d2 <- read_amp_classifications("data/GWMC_ASV_vs_MiDAS_5.0.sintax")
+
+#Merge data into one data-table
+merged_map2 <- rbind.data.frame(a2,b2,c2,d2)
+
+#Separate the taxonomy in ranks
+merged_map2 <- merged_map2[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+
+#Remove unused columns
+merged_map2 <- merged_map2[,V4:=NULL]
+merged_map2 <- merged_map2[,K:=NULL]
+merged_map2 <- merged_map2[,P:=NULL]
+merged_map2 <- merged_map2[,C:=NULL]
+merged_map2 <- merged_map2[,O:=NULL]
+merged_map2 <- merged_map2[,F:=NULL]
+merged_map2 <- merged_map2[,S:=NULL]
+
+# Read ASV table
+ASVtable <- data.table::fread("data/GWMC_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and classification
+df2 <- merge.data.table(ASVtable, merged_map2, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long2 <- melt.data.table(df2, id.vars = c(1,(ncol(df2)-1):(ncol(df2))), measure.vars = 2:(ncol(df2)-2), variable.name = "SeqID", value.name = "Counts") 
+
+df_long2 <- df_long2[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+#Summarize data
+#Calculate fraction of ASVs classified at the genus level in the reference databases
+rc_GWMC <- df_long2[Rel_abun>0.01 & Counts>0, .("Classified"=(.N-sum(is.na(G)))/.N*100,
+            "detected_amplicons"=.N), by=.(Database,SeqID)][,Primer:="V4 (GWMC)"]
+
+#Calculate fraction of ASVs with genus level classification in the reference databases
+Summary2_GWMC <- rc_GWMC[,.("Mean"=mean(Classified),
+            "Stdev"=sd(Classified)),
+            by=.(Database)][,Primer:="V4 (GWMC)"]
+
+
+#Combine summary
+Summary2 <- rbind(Summary2_V13, Summary2_V4)
+Summary2 <- rbind(Summary2, Summary2_GWMC)
+
+#Combine mapping results
+rc <- rbind(rc_V13, rc_V4)
+rc <- rbind(rc, rc_GWMC)
+rc <- rc[, Database:=factor(Database, levels=c("GTDB_ssu_r202","SILVA_138.1_SSURef_NR99","MiDAS_4.8.1","MiDAS_5.0"))]
+rc <- rc[, Primer:=factor(Primer, levels=c("V1-V3 (MiDAS 4)","V4 (MiDAS 4)","V4 (GWMC)"))]
+
+
+#Print summary for genus level classfication 
+write.csv2(Summary2, file="output/Genus_classification_summary.txt", row.names=FALSE, quote=FALSE)
+
+
+## Plot histogram
+p2 <- ggplot(data=rc, aes(x=Database, y=Classified, fill=Database)) +
+  theme_bw() +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1, fill="white")+
+  ylab("Percent of ASVs classified at the genus-level") +
+  scale_fill_brewer(palette="Set2")+
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(legend.position = "none") +
+  facet_grid(~Primer) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
+
+rm(df2, df_long2,merged_map2,rc,r0001c,r001c,r01c)
+```
+
+## Create classification graphs for species
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+### V13
+# Read classifications 
+a2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_GTDB_ssu_r202.sintax")
+b2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_SILVA_138.1_SSURef_NR99.sintax")
+c2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_MiDAS_4.8.1.sintax")
+d2 <- read_amp_classifications("data/MiDAS4_V13ASV_vs_MiDAS_5.0.sintax")
+
+#Summarize data
+merged_map3 <- rbind.data.frame(a2,b2,c2,d2)
+merged_map3 <- merged_map3[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+
+#Remove unused columns
+merged_map3 <- merged_map3[,V4:=NULL]
+merged_map3 <- merged_map3[,K:=NULL]
+merged_map3 <- merged_map3[,P:=NULL]
+merged_map3 <- merged_map3[,C:=NULL]
+merged_map3 <- merged_map3[,O:=NULL]
+merged_map3 <- merged_map3[,F:=NULL]
+merged_map3 <- merged_map3[,G:=NULL]
+
+# Read ASV table
+ASVtable <- data.table::fread("data/MiDAS4_V13_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df3 <- merge.data.table(ASVtable, merged_map3, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long3 <- melt.data.table(df3, id.vars = c(1,(ncol(df3)-1):(ncol(df3))), measure.vars = 2:(ncol(df3)-2), variable.name = "SeqID", value.name = "Counts") 
+df_long3 <- df_long3[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+
+rc2_V13 <- df_long3[Rel_abun>0.01 & Counts>0, .("Classified"=(.N-sum(is.na(S)))/.N*100,
+            "detected_amplicons"=.N), by=.(Database,SeqID)][,Primer:="V1-V3 (MiDAS 4)"]
+
+#Calculate fraction of ASVs with species level classification in the reference databases
+Summary3_V13 <- rc2_V13[,.("Mean"=mean(Classified),
+            "Stdev"=sd(Classified)),
+            by=.(Database)][,Primer:="V1-V3 (MiDAS 4)"]
+
+
+### V4 (MiDAS 4)
+# Read classifications 
+a2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_GTDB_ssu_r202.sintax")
+b2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_SILVA_138.1_SSURef_NR99.sintax")
+c2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_MiDAS_4.8.1.sintax")
+d2 <- read_amp_classifications("data/MiDAS4_V4ASV_vs_MiDAS_5.0.sintax")
+
+#Summarize data
+merged_map3 <- rbind.data.frame(a2,b2,c2,d2)
+merged_map3 <- merged_map3[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+
+#Remove unused columns
+merged_map3 <- merged_map3[,V4:=NULL]
+merged_map3 <- merged_map3[,K:=NULL]
+merged_map3 <- merged_map3[,P:=NULL]
+merged_map3 <- merged_map3[,C:=NULL]
+merged_map3 <- merged_map3[,O:=NULL]
+merged_map3 <- merged_map3[,F:=NULL]
+merged_map3 <- merged_map3[,G:=NULL]
+
+# Read ASV table
+ASVtable <- data.table::fread("data/MiDAS4_V4_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df3 <- merge.data.table(ASVtable, merged_map3, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long3 <- melt.data.table(df3, id.vars = c(1,(ncol(df3)-1):(ncol(df3))), measure.vars = 2:(ncol(df3)-2), variable.name = "SeqID", value.name = "Counts") 
+df_long3 <- df_long3[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+
+rc2_V4 <- df_long3[Rel_abun>0.01 & Counts>0, .("Classified"=(.N-sum(is.na(S)))/.N*100,
+            "detected_amplicons"=.N), by=.(Database,SeqID)][,Primer:="V4 (MiDAS 4)"]
+
+#Calculate fraction of ASVs with species level classification in the reference databases
+Summary3_V4 <- rc2_V4[,.("Mean"=mean(Classified),
+            "Stdev"=sd(Classified)),
+            by=.(Database)][,Primer:="V4 (MiDAS 4)"]
+
+### V4 GWMC
+# Read classifications 
+a2 <- read_amp_classifications("data/GWMC_ASV_vs_GTDB_ssu_r202.sintax")
+b2 <- read_amp_classifications("data/GWMC_ASV_vs_SILVA_138.1_SSURef_NR99.sintax")
+c2 <- read_amp_classifications("data/GWMC_ASV_vs_MiDAS_4.8.1.sintax")
+d2 <- read_amp_classifications("data/GWMC_ASV_vs_MiDAS_5.0.sintax")
+
+#Summarize data
+merged_map3 <- rbind.data.frame(a2,b2,c2,d2)
+merged_map3 <- merged_map3[,c("K","P","C","O","F","G","S") := tstrsplit(V4, ",", fixed=TRUE)]
+
+#Remove unused columns
+merged_map3 <- merged_map3[,V4:=NULL]
+merged_map3 <- merged_map3[,K:=NULL]
+merged_map3 <- merged_map3[,P:=NULL]
+merged_map3 <- merged_map3[,C:=NULL]
+merged_map3 <- merged_map3[,O:=NULL]
+merged_map3 <- merged_map3[,F:=NULL]
+merged_map3 <- merged_map3[,G:=NULL]
+
+# Read ASV table
+ASVtable <- data.table::fread("data/GWMC_ASVtab.txt",
+                      sep = "\t",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+ASVtable <- setnames(ASVtable, 1, "ASV")
+ASVtable <- ASVtable[order(, readr::parse_number(ASV))]
+
+# Merge ASV table and mappings
+df3 <- merge.data.table(ASVtable, merged_map3, by="ASV")
+
+# Rearrange data.table into long format with Database and SeqID as variables
+df_long3 <- melt.data.table(df3, id.vars = c(1,(ncol(df3)-1):(ncol(df3))), measure.vars = 2:(ncol(df3)-2), variable.name = "SeqID", value.name = "Counts") 
+df_long3 <- df_long3[, Rel_abun := Counts/sum(Counts)*100, by=.(SeqID,Database)]
+
+
+#Calculate fraction of ASVs with 99% matches in the reference databases
+
+rc2_GWMC <- df_long3[Rel_abun>0.01 & Counts>0, .("Classified"=(.N-sum(is.na(S)))/.N*100,
+            "detected_amplicons"=.N), by=.(Database,SeqID)][,Primer:="V4 (GWMC)"]
+
+#Calculate fraction of ASVs with species level classification in the reference databases
+Summary3_GWMC <- rc2_GWMC[,.("Mean"=mean(Classified),
+            "Stdev"=sd(Classified)),
+            by=.(Database)][,Primer:="V4 (GWMC)"]
+
+#Combine summary
+Summary3 <- rbind(Summary3_V13, Summary3_V4)
+Summary3 <- rbind(Summary3, Summary3_GWMC)
+
+#Combine mapping results
+rc2 <- rbind(rc2_V13, rc2_V4)
+rc2 <- rbind(rc2, rc2_GWMC)
+rc2 <- rc2[, Database:=factor(Database, levels=c("GTDB_ssu_r202","SILVA_138.1_SSURef_NR99","MiDAS_4.8.1","MiDAS_5.0"))]
+rc2 <- rc2[, Primer:=factor(Primer, levels=c("V1-V3 (MiDAS 4)","V4 (MiDAS 4)","V4 (GWMC)"))]
+
+write.csv2(Summary3, file="output/Species_classification_summary_V4.txt", row.names=FALSE, quote=FALSE)
+
+## Plot histogram
+p3 <- ggplot(data=rc2, aes(x=Database, y=Classified, fill=Database)) +
+  theme_bw() +
+  geom_violin(scale = "width") +
+  geom_boxplot(width=0.1, fill="white")+
+  ylab("Percent of ASVs classified at the species-level") +
+  scale_fill_brewer(palette="Set2")+
+  theme(axis.title.x=element_blank()) +
+  scale_y_continuous(limits = c(0, 100), breaks=seq(0,100,10)) +
+  theme(legend.position = "none") +
+  facet_grid(~Primer) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
+```
+
+## Create merged graph
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+p <- p1 + p2 + p3 +plot_layout(ncol=1)
+```
+
+## Export data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggsave(filename="output/FigureS2_Database_evaluation_MiDAS4.pdf", plot=p, width=9, height=12, useDingbats=FALSE, limitsize=FALSE)
+```

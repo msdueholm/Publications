@@ -1,0 +1,851 @@
+---
+title: "Figure 6-8 and S6-S11: Heatmaps"
+author: "Morten K.D. Dueholm"
+date: "2023-01-10"
+---
+
+#Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ampvis2)
+library(data.table)
+library(patchwork)
+library(forcats)
+library(tidyverse)
+```
+
+#Load data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#load metadata
+Sample_metadata <- read.csv("data/DataS1_AD_metadata_220401.txt", sep="\t")
+Sample_metadata[Sample_metadata==""]<-NA
+Sample_metadata <- mutate(Sample_metadata, Sample_id = str_extract(SampleID, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+Sample_metadata <- mutate(Sample_metadata, AD_id = str_extract(SampleID, pattern = "[A-Z,2]{2,3}-[0-9]{2}"))
+
+#V13
+V13_metadata <- read.csv("data/V13_Metadata.txt", sep=",",header = FALSE)
+V13_metadata <- mutate(V13_metadata, Sample_id = str_extract(V2, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+V13_metadata <- merge.data.frame(V13_metadata, Sample_metadata, by ="Sample_id", all.x = TRUE) %>%
+  select(V1, everything())
+V13_metadata <- mutate(V13_metadata, TempSubstrate = paste(Temperature_range, Primary_substrate, sep=";"))
+
+d13 <- amp_load(otutab = "data/V13_ASVtab.txt", 
+                taxonomy = "data/V13ASV_vs_MiDAS_5.0.sintax",
+                metadata = V13_metadata)
+
+d13n <- amp_subset_samples(d13, minreads = 10000, normalise = TRUE)
+
+#V4
+V4_metadata <- read.csv("data/V4c_Metadata.txt", sep=",",header = FALSE)
+V4_metadata <- mutate(V4_metadata, Sample_id = str_extract(V2, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+V4_metadata <- merge.data.frame(V4_metadata, Sample_metadata, by ="Sample_id", all.x = TRUE) %>%
+  select(V1, everything())
+V4_metadata <- mutate(V4_metadata, TempSubstrate = paste(Temperature_range, Primary_substrate, sep=";"))
+
+d4 <- amp_load(otutab = "data/V4_ASVtab.txt", 
+                taxonomy = "data/V4ASV_vs_MiDAS_5.0.sintax",
+                metadata = V4_metadata)
+
+d4n <- amp_subset_samples(d4, minreads = 10000, normalise = TRUE)
+
+#V35
+V35_metadata <- read.csv("data/V35_Metadata.txt", sep=",",header = FALSE)
+V35_metadata <- mutate(V35_metadata, Sample_id = str_extract(V2, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+V35_metadata <- merge.data.frame(V35_metadata, Sample_metadata, by ="Sample_id", all.x = TRUE) %>%
+  select(V1, everything())
+V35_metadata <- mutate(V35_metadata, TempSubstrate = paste(Temperature_range, Primary_substrate, sep=";"))
+
+
+d35 <- amp_load(otutab = "data/V35_reverse_250bp_ASVtab.txt", 
+                taxonomy = "data/V35_reverse_250bp_ASV_vs_MiDAS_5.0.sintax",
+                metadata = V35_metadata)
+
+d35_arc <- amp_subset_taxa(d35, tax_vector = "k__Archaea", normalise = FALSE)
+d35n <- amp_subset_samples(d35_arc, minreads = 10000, normalise = TRUE)
+```
+
+### Figure S6: Archaea diversity (V3-V5: archaea only)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Select data
+df <- amp_subset_samples(d35n, Primary_substrate %in% c("Food waste","Industrial","Manure","Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Thermophilic", "Mesophilic"))       
+
+# Group unclassified species and genera
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+df$tax$Genus <- if_else(df$tax$Genus =="","g__Unclassified",df$tax$Genus)
+
+
+# Create heatmap for primary substrates and temperature range
+df1 <- amp_heatmap(df,
+            group_by = "TempSubstrate",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df1 <- df1 %>%
+  mutate(Genus = rownames(df1)) %>%
+  gather(1:length(unique(df$metadata$TempSubstrate)), key="TempSubstrate", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,25,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-10%","10-25%",">25%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p1 <- ggplot(df1, aes(TempSubstrate, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 1)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Create heatmap for countries based on mesophilic ADs treating Wastewater sludge
+dfww <- amp_subset_samples(df, Primary_substrate %in% c("Wastewater sludge"))
+dfww <- amp_subset_samples(dfww, Temperature_range %in% c("Mesophilic"))
+
+df2 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df2 <- df2 %>%
+  mutate(Genus = rownames(df2)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,25,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-10%","10-25%",">25%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p2 <- ggplot(df2, aes(Country, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 1)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+
+# Combine p1 and p2
+p1 <- p1 + theme(legend.position = "none")
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(10,8))
+
+ggsave(filename="output/FigureS6_Archaea_V35.pdf", plot=p, width=200, height=90, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+### Figure 6 and S7: Archaea diversity (V4: archaea only)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Select data
+df <- amp_subset_samples(d4n, Primary_substrate %in% c("Food waste","Industrial","Manure","Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Thermophilic", "Mesophilic"))       
+df <- amp_subset_taxa(df, tax_vector = c("k__Archaea"), normalise = FALSE)
+df <- normaliseTo100(df)
+
+# Group unclassified species and genera
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+df$tax$Genus <- if_else(df$tax$Genus =="","g__Unclassified",df$tax$Genus)
+
+# Create heatmap for primary substrates and temperature range
+df1 <- amp_heatmap(df,
+            group_by = "TempSubstrate",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df1 <- df1 %>%
+  mutate(Genus = rownames(df1)) %>%
+  gather(1:length(unique(df$metadata$TempSubstrate)), key="TempSubstrate", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,25,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-10%","10-25%",">25%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p1 <- ggplot(df1, aes(TempSubstrate, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 1)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Create heatmap for countries based on mesophilic ADs treating Wastewater sludge
+dfww <- amp_subset_samples(df, Primary_substrate %in% c("Wastewater sludge"))
+dfww <- amp_subset_samples(dfww, Temperature_range %in% c("Mesophilic"))
+
+df2 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df2 <- df2 %>%
+  mutate(Genus = rownames(df2)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,25,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-10%","10-25%",">25%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p2 <- ggplot(df2, aes(Country, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 1)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+
+# Combine p1 and p2
+p1 <- p1 + theme(legend.position = "none")
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(10,16))
+
+ggsave(filename="output/Figure6_Archaea_V4.pdf", plot=p, width=240, height=90, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+
+#Create heat map for the top 100 most abundant ASVs in mesophilic digesters treating wastewater sludge
+df3 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "OTU",
+            tax_add = "Genus",
+            measure = "mean",
+            tax_show = 100,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df3 <- df3 %>%
+  mutate(Taxonomy = rownames(df3)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Taxonomy = fct_reorder(Taxonomy, RA, mean)) %>%
+  mutate(Taxonomy = fct_relevel(Taxonomy, grep("Remaining taxa", Taxonomy, value = TRUE)[1])) %>%  
+  mutate(Taxonomy = fct_relevel(Taxonomy, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,10,25,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-10%","10-25%",">25%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p3 <- ggplot(df3, aes(Country, Taxonomy)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 1)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+ggsave(filename="output/FigureS7_Archaea_ASV_V4.pdf", plot=p3, width= 160, height=250, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+
+### FIGURE 7: Syntrophes (V1-V3)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Define Syntrophes
+Syntrophes <- c("g__Syntrophomonas","g__Syntrophothermus", "g__Pelotomaculum", "g__Tepidimicrobium", "g__Thermacetogenium",
+                "g__Syntrophaceticus", "g__Tepidanaerobacter", "g__Syntrophus", "g__Syntrophobacter", "g__Smithella", 
+                "g__Syntrophorhabdus", "g__Geobacter", "g__Desulfovibrio", "g__Pseudothermotoga", "g__Aminobacterium", 
+                "g__Thermanaerovibrio", "g__Ca_Phosphitivorax", "g__Ca_Propionivorax")
+
+#Select data
+df <- amp_subset_samples(d13n, Primary_substrate %in% c("Food waste","Industrial","Manure","Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Thermophilic", "Mesophilic"))       
+df <- amp_subset_taxa(df, tax_vector = Syntrophes, normalise = FALSE)
+
+# Group unclassified species and genera
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+df$tax$Genus <- if_else(df$tax$Genus =="","g__Unclassified",df$tax$Genus)
+
+# Create heatmap for primary substrates and temperature range
+df1 <- amp_heatmap(df,
+            group_by = "TempSubstrate",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df1 <- df1 %>%
+  mutate(Genus = rownames(df1)) %>%
+  gather(1:length(unique(df$metadata$TempSubstrate)), key="TempSubstrate", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p1 <- ggplot(df1, aes(TempSubstrate, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Create heatmap for countries based on mesophilic ADs treating Wastewater sludge
+dfww <- amp_subset_samples(df, Primary_substrate %in% c("Wastewater sludge"))
+dfww <- amp_subset_samples(dfww, Temperature_range %in% c("Mesophilic"))
+
+df2 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df2 <- df2 %>%
+  mutate(Genus = rownames(df2)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p2 <- ggplot(df2, aes(Country, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Combine p1 and p2
+p1 <- p1 + theme(legend.position = "none")
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(10,16))
+
+ggsave(filename="output/Figure7_Syntrophes_V13.pdf", plot=p, width=200, height=80, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+### FIGURE S8: Syntrophes (V4)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Define Syntrophes
+Syntrophes <- c("g__Syntrophomonas","g__Syntrophothermus", "g__Pelotomaculum", "g__Tepidimicrobium", "g__Thermacetogenium",
+                "g__Syntrophaceticus", "g__Tepidanaerobacter", "g__Syntrophus", "g__Syntrophobacter", "g__Smithella", 
+                "g__Syntrophorhabdus", "g__Geobacter", "g__Desulfovibrio", "g__Pseudothermotoga", "g__Aminobacterium", 
+                "g__Thermanaerovibrio", "g__Ca_Phosphitivorax", "g__Ca_Propionivorax")
+
+#Select data
+df <- amp_subset_samples(d4n, Primary_substrate %in% c("Food waste","Industrial","Manure","Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Thermophilic", "Mesophilic"))       
+df <- amp_subset_taxa(df, tax_vector = Syntrophes, normalise = FALSE)
+
+# Group unclassified species and genera
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+df$tax$Genus <- if_else(df$tax$Genus =="","g__Unclassified",df$tax$Genus)
+
+# Create heatmap for primary substrates and temperature range
+df1 <- amp_heatmap(df,
+            group_by = "TempSubstrate",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df1 <- df1 %>%
+  mutate(Genus = rownames(df1)) %>%
+  gather(1:length(unique(df$metadata$TempSubstrate)), key="TempSubstrate", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p1 <- ggplot(df1, aes(TempSubstrate, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Create heatmap for countries based on mesophilic ADs treating Wastewater sludge
+dfww <- amp_subset_samples(df, Primary_substrate %in% c("Wastewater sludge"))
+dfww <- amp_subset_samples(dfww, Temperature_range %in% c("Mesophilic"))
+
+df2 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 20,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df2 <- df2 %>%
+  mutate(Genus = rownames(df2)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p2 <- ggplot(df2, aes(Country, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Combine p1 and p2
+p1 <- p1 + theme(legend.position = "none")
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(10,16))
+
+ggsave(filename="output/FigureS8_Syntrophes_V4.pdf", plot=p, width=200, height=80, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+### FIGURE S9: Species-level diversity of selected syntrophs (V1-V3)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Select data
+df <- amp_subset_samples(d13n, Primary_substrate %in% c("Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Mesophilic"))
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+
+# Create function to make top species-level heatmaps 
+SpeciesHeatmap <- GenusDataPrep <- function(Genus) {
+df1 <- amp_subset_taxa(df, tax_vector = Genus, normalise = FALSE)
+  
+df2a <- amp_heatmap(df1,
+            group_by = "Country",
+            tax_aggregate = "Species",
+            tax_add = "Genus",
+            measure = "mean",
+            tax_show = if_else("s__Unclassified" %in% df$tax$Species, 11, 10),
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE) %>%
+  mutate(Tax = rownames(.))
+
+df2b <- amp_heatmap(df1,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 1,
+            showRemainingTaxa = FALSE,
+            tax_empty ="remove",
+            normalise = FALSE,
+            textmap = TRUE) %>%
+  mutate(Tax = rownames(.))
+
+df2 <- merge(df2a, df2b, all = TRUE)
+  
+df3 <- df2 %>%
+  gather(1:(length(unique(df$metadata$Country))), key="Country", value="RA") %>%
+  mutate(Tax = fct_reorder(Tax, RA, mean)) %>%
+  mutate(Tax = fct_relevel(Tax, grep("Remaining taxa", Tax, value = TRUE)[1])) %>%  
+  mutate(Tax = fct_relevel(Tax, paste(substr(Genus, 4,100),"; Unclassified",sep=""))) %>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+p <- ggplot(df3, aes(Country, Tax)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))}
+
+# Create heatmaps
+p1 <- SpeciesHeatmap("g__Smithella")
+p2 <- SpeciesHeatmap("g__Syntrophorhabdus")
+p3 <- SpeciesHeatmap("g__Syntrophomonas")
+p4 <- SpeciesHeatmap("g__Ca_Phosphitivorax")
+
+# Combine p1, p2, p3 and p4
+p1 <- p1 + theme(axis.text.x = element_blank())
+p2 <- p2 + theme(axis.text.x = element_blank())
+p3 <- p3 + theme(axis.text.x = element_blank())
+p <- p1 + p2 + p3 + p4 + plot_layout(ncol=1,heights = c(10,10,10,10))
+
+ggsave(filename="output/FigureS9_Syntroph_species_V13.pdf", plot=p, width=180, height=180, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+### Figure 8: Filaments (V1-V3)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+Filaments <- c("g__Ca_Microthrix", "g__Leptothrix","g__Sphaerotilus","g__Ca_Villigracilis","g__Trichococcus",
+               "g__Thiothrix","g__Ca_Promineofilum","Haliscomenobacter","g__Gordonia","g__Sarcinithrix","g__Ca_Amarolinea","g__Kouleothrix","g__Ca_Alysiosphaera",
+               "g__Nocardioides","g__midas_g_1668","g__Anaerolinea","g__midas_g_105","g__midas_g_2111","g__midas_g_344",
+               "g__Skermania","g__Ca_Nostocoida","g__Neomegalonema","g__Beggiatoa","g__Ca_Brevefilum")
+
+#Select data
+df <- amp_subset_samples(d13n, Primary_substrate %in% c("Food waste","Industrial","Manure","Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Thermophilic", "Mesophilic"))       
+df <- amp_subset_taxa(df, tax_vector = Filaments, normalise = FALSE)
+
+# Group unclassified species and genera
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+df$tax$Genus <- if_else(df$tax$Genus =="","g__Unclassified",df$tax$Genus)
+
+
+# Create heatmap for primary substrates and temperature range
+df1 <- amp_heatmap(df,
+            group_by = "TempSubstrate",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 50,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df1 <- df1 %>%
+  mutate(Genus = rownames(df1)) %>%
+  gather(1:length(unique(df$metadata$TempSubstrate)), key="TempSubstrate", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p1 <- ggplot(df1, aes(TempSubstrate, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Create heatmap for countries based on mesophilic ADs treating Wastewater sludge
+dfww <- amp_subset_samples(df, Primary_substrate %in% c("Wastewater sludge"))
+dfww <- amp_subset_samples(dfww, Temperature_range %in% c("Mesophilic"))
+
+df2 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 50,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df2 <- df2 %>%
+  mutate(Genus = rownames(df2)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p2 <- ggplot(df2, aes(Country, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Combine p1 and p2
+p1 <- p1 + theme(legend.position = "none")
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(10,16))
+
+ggsave(filename="output/Figure8_Filaments_V13.pdf", plot=p, width=200, height=90, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+
+### Figure S10: Filaments (V4)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+Filaments <- c("g__Ca_Microthrix", "g__Leptothrix","g__Sphaerotilus","g__Ca_Villigracilis","g__Trichococcus",
+               "g__Thiothrix","g__Ca_Promineofilum","Haliscomenobacter","g__Gordonia","g__Sarcinithrix","g__Ca_Amarolinea","g__Kouleothrix","g__Ca_Alysiosphaera",
+               "g__Nocardioides","g__midas_g_1668","g__Anaerolinea","g__midas_g_105","g__midas_g_2111","g__midas_g_344",
+               "g__Skermania","g__Ca_Nostocoida","g__Neomegalonema","g__Beggiatoa","g__Ca_Brevefilum")
+
+#Select data
+df <- amp_subset_samples(d4n, Primary_substrate %in% c("Food waste","Industrial","Manure","Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Thermophilic", "Mesophilic"))       
+df <- amp_subset_taxa(df, tax_vector = Filaments, normalise = FALSE)
+
+# Group unclassified species and genera
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+df$tax$Genus <- if_else(df$tax$Genus =="","g__Unclassified",df$tax$Genus)
+
+
+# Create heatmap for primary substrates and temperature range
+df1 <- amp_heatmap(df,
+            group_by = "TempSubstrate",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 50,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df1 <- df1 %>%
+  mutate(Genus = rownames(df1)) %>%
+  gather(1:length(unique(df$metadata$TempSubstrate)), key="TempSubstrate", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p1 <- ggplot(df1, aes(TempSubstrate, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Create heatmap for countries based on mesophilic ADs treating Wastewater sludge
+dfww <- amp_subset_samples(df, Primary_substrate %in% c("Wastewater sludge"))
+dfww <- amp_subset_samples(dfww, Temperature_range %in% c("Mesophilic"))
+
+df2 <- amp_heatmap(dfww,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 50,
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE)
+  
+df2 <- df2 %>%
+  mutate(Genus = rownames(df2)) %>%
+  gather(1:length(unique(dfww$metadata$Country)), key="Country", value="RA") %>%
+  mutate(Genus = fct_reorder(Genus, RA, mean)) %>%
+  mutate(Genus = fct_relevel(Genus, grep("Remaining taxa", Genus, value = TRUE)[1])) %>%  
+  mutate(Genus = fct_relevel(Genus, "Unclassified"))%>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+
+p2 <- ggplot(df2, aes(Country, Genus)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))
+
+# Combine p1 and p2
+p1 <- p1 + theme(legend.position = "none")
+p <- p1 + p2 + plot_layout(ncol=2,widths = c(10,16))
+
+ggsave(filename="output/FigureS10_Filaments_V4.pdf", plot=p, width=200, height=90, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```
+
+
+### FIGURE S11: Species-level diversity of selected filaments (V1-V3)
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Select data
+df <- amp_subset_samples(d13n, Primary_substrate %in% c("Wastewater sludge"))
+df <- amp_subset_samples(df, Temperature_range %in% c("Mesophilic"))
+df$tax$Species <- if_else(df$tax$Species =="","s__Unclassified",df$tax$Species)
+
+# Create function to make top species-level heatmaps 
+SpeciesHeatmap <- GenusDataPrep <- function(Genus) {
+df1 <- amp_subset_taxa(df, tax_vector = Genus, normalise = FALSE)
+  
+df2a <- amp_heatmap(df1,
+            group_by = "Country",
+            tax_aggregate = "Species",
+            tax_add = "Genus",
+            measure = "mean",
+            tax_show = if_else("s__Unclassified" %in% df$tax$Species, 11, 10),
+            showRemainingTaxa = TRUE,
+            tax_empty ="OTU",
+            normalise = FALSE,
+            textmap = TRUE) %>%
+  mutate(Tax = rownames(.))
+
+df2b <- amp_heatmap(df1,
+            group_by = "Country",
+            tax_aggregate = "Genus",
+            measure = "mean",
+            tax_show = 1,
+            showRemainingTaxa = FALSE,
+            tax_empty ="remove",
+            normalise = FALSE,
+            textmap = TRUE) %>%
+  mutate(Tax = rownames(.))
+
+df2 <- merge(df2a, df2b, all = TRUE)
+  
+df3 <- df2 %>%
+  gather(1:(length(unique(df$metadata$Country))), key="Country", value="RA") %>%
+  mutate(Tax = fct_reorder(Tax, RA, mean)) %>%
+  mutate(Tax = fct_relevel(Tax, grep("Remaining taxa", Tax, value = TRUE)[1])) %>%  
+  mutate(Tax = fct_relevel(Tax, paste(substr(Genus, 4,100),"; Unclassified",sep=""))) %>%
+  mutate(countfactor=cut(RA,breaks=c(-1,0.01,0.1,1,2,5,100),
+                             labels=c("<0.01%","0.01%-0.1%","0.1%-1%","1-2%","2-5%",">5%"))) %>%
+  mutate(countfactor=factor(as.character(countfactor),levels=rev(levels(countfactor))))
+
+p <- ggplot(df3, aes(Country, Tax)) +
+     geom_tile(aes(fill = countfactor)) + 
+     geom_text(aes(label = round(RA, 2)),size = 6/ggplot2::.pt) +
+     theme_bw() +
+     theme(axis.title.y = element_blank()) +
+     theme(axis.title.x = element_blank()) +
+     theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1)) +
+     scale_fill_manual(values=c("#d94801","#f16913","#fd8d3c","#fdae6b","#fdd0a2","#feedde")) +
+     theme(text=element_text(size=6, colour = "black"),
+           axis.text = element_text(size = 6, colour = "black"),
+           axis.title = element_text(size = 6, face = "bold", colour = "black"),
+           legend.text = element_text(size = 6, colour = "black"),
+           legend.title = element_text(size = 6, face ="bold", colour = "black"))}
+
+Filaments <- c("g__Ca_Microthrix", "g__Leptothrix","g__Sphaerotilus","g__Ca_Villigracilis","g__Trichococcus",
+               "g__Thiothrix","g__Ca_Promineofilum","Haliscomenobacter","g__Gordonia","g__Sarcinithrix","g__Ca_Amarolinea","g__Kouleothrix","g__Ca_Alysiosphaera",
+               "g__Nocardioides","g__midas_g_1668","g__Anaerolinea","g__midas_g_105","g__midas_g_2111","g__midas_g_344",
+               "g__Skermania","g__Ca_Nostocoida","g__Neomegalonema","g__Beggiatoa","g__Ca_Brevefilum")
+
+# Create heatmaps
+p1 <- SpeciesHeatmap("g__Ca_Brevefilum")
+p2 <- SpeciesHeatmap("g__Ca_Promineofilum")
+p3 <- SpeciesHeatmap("g__Ca_Microthrix")
+p4 <- SpeciesHeatmap("g__Gordonia")
+p5 <- SpeciesHeatmap("g__Trichococcus")
+
+
+# Combine p1, p2, p3 and p4
+p1 <- p1 + theme(axis.text.x = element_blank())
+p2 <- p2 + theme(axis.text.x = element_blank())
+p3 <- p3 + theme(axis.text.x = element_blank())
+p4 <- p4 + theme(axis.text.x = element_blank())
+p <- p1 + p2 + p3 + p4 + p5 + plot_layout(ncol=1,heights = c(length(unique(p1$data$Tax)),
+                                                             length(unique(p2$data$Tax)),
+                                                             length(unique(p3$data$Tax)),
+                                                             length(unique(p4$data$Tax)),
+                                                             length(unique(p5$data$Tax))))
+
+ggsave(filename="output/FigureS11_Filaments_species_V13.pdf", plot=p, width=150, height=150, units = "mm", useDingbats=FALSE, limitsize=FALSE)
+```

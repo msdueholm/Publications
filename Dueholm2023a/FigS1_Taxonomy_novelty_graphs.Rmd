@@ -1,0 +1,105 @@
+---
+title: "Figure S1: Taxonomy novelty graphs"
+author: "Morten Kam Dahl Dueholm"
+date: "2022-07-08"
+---
+
+## R-packages
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(data.table)
+library(patchwork)
+```
+
+## Import data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read MiDAS 5.0 FL-ASV taxonomy data
+df <- read.delim("data/tax_complete.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+
+# Read MiDAS 4.8.1 FL-ASV taxonomy data
+df2 <- read.delim("data/tax_complete_midas4.8.1.csv",
+                      sep = ",",
+                      header = TRUE,
+                      quote = "\"",
+                      fill = TRUE,
+                      check.names = FALSE,
+                      stringsAsFactors = FALSE)
+
+# Filter new FL-ASVs in MiDAS 5.0 and group de novo phyla
+df3 <- df %>%
+  filter(!(FLASV %in% df2$FLASV)) %>%
+  mutate(Phylum = if_else(grepl("midas", Phylum),"De novo", Phylum)) %>%
+  mutate(Phylum = as.factor(Phylum))
+  
+
+# Filter new FL-ASVs in MiDAS 5.0 from Firmicutes and group de novo families
+df4 <- df3 %>%
+  filter(Phylum == "Firmicutes") %>%
+  mutate(Family = if_else(grepl("midas", Family),"De novo", Family)) %>%
+  mutate(Family = as.factor(Family))
+
+```
+
+# Novelty Calculations for phyla
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Novelty <- df3 %>%
+  group_by(Phylum) %>%
+  summarize("New FL-ASVs"= n_distinct(FLASV, na.rm = TRUE),
+            "New genera"= n_distinct(Genus[!(Genus %in% df2$Genus)],na.rm = TRUE),
+            "New families"= n_distinct(Family[!(Family %in% df2$Family)],na.rm = TRUE),
+            "New orders"= n_distinct(Order[!(Order %in% df2$Order)],na.rm = TRUE),
+            "New classes"= n_distinct(Class[!(Class %in% df2$Class)],na.rm = TRUE)) %>%
+  gather(2:6, key = "Taxonomic_rank", value = "Counts") %>%
+    mutate(Taxonomic_rank=factor(Taxonomic_rank, levels=c("New classes","New orders","New families","New genera","New FL-ASVs"))) %>%
+  filter(Counts>0) %>%
+mutate(Phylum=fct_relevel(Phylum, "De novo", after = Inf))
+```
+# Novelty Calculations for Firmicutes families
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Novelty2 <- df4 %>%
+  group_by(Family) %>%
+  summarize("New FL-ASVs"= n_distinct(FLASV, na.rm = TRUE),
+            "New genera"= n_distinct(Genus[!(Genus %in% df2$Genus)],na.rm = TRUE)) %>%
+  gather(2:3, key = "Taxonomic_rank", value = "Counts") %>%
+    mutate(Taxonomic_rank=factor(Taxonomic_rank, levels=c("New genera","New FL-ASVs"))) %>%
+  filter(Counts>0) %>%
+mutate(Family=fct_relevel(Family, "De novo", after = Inf))
+```
+
+
+## Plot histogram
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+p1 <- ggplot(data=Novelty, aes(x=Phylum, y=Counts, fill=Taxonomic_rank)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity",position = "identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  scale_fill_brewer(palette = "Set2")+
+  ylab("Number of new taxa introduced") + 
+  theme(axis.title.x=element_blank())+
+  theme(legend.position = "none")+
+  facet_grid(Taxonomic_rank~., scales="free")
+
+p2 <- ggplot(data=Novelty2, aes(x=Family, y=Counts, fill=Taxonomic_rank)) +
+  theme_bw() +
+  geom_bar(color="black",stat="identity",position = "identity", width=0.8) +
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1)) +
+  scale_fill_brewer(palette = "Set2")+
+  ylab("Number of new taxa introduced") + 
+  theme(axis.title.x=element_blank())+
+  theme(legend.position = "none")+
+  facet_grid(Taxonomic_rank~., scales="free")
+
+p = p1 + p2 + plot_layout(ncol = 1, nrow = 2, heights = c(10, 4))
+```
+
+## Export data
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ggsave(filename="output/FigureS1_Novel_taxa.pdf", plot=p, width=12, height=13, useDingbats=FALSE, limitsize=FALSE)
+
+```

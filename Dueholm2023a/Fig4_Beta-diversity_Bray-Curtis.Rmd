@@ -1,0 +1,504 @@
+---
+title: "Figure 4: Beta-diversity with Bray Curtis disimilarity"
+author: "Morten K. D. Dueholm"
+date: "2022-04-19"
+---
+
+#Load packages
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+library(ampvis2)
+library(tidyverse)
+library(vegan)
+#library(ggrepel)
+library(patchwork)
+```
+
+#Load data
+```{r MD data}
+#load metadata
+Sample_metadata <- read.csv("data/DataS1_AD_metadata_220401.txt", sep="\t")
+Sample_metadata[Sample_metadata==""]<-NA
+Sample_metadata <- mutate(Sample_metadata, Sample_id = str_extract(SampleID, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+
+### Load V1-V3 data
+
+#Subset metadata based on V1-V3 samples
+V13_metadata <- read.csv("data/V13_Metadata.txt", sep=",",header = FALSE)
+V13_metadata <- mutate(V13_metadata, Sample_id = str_extract(V2, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+V13_metadata <- merge.data.frame(V13_metadata, Sample_metadata, by ="Sample_id", all.x = TRUE) %>%
+  select(V1, everything())
+
+#Load V13ASV table and taxonomy manually
+V13_ASVtab <- read.csv("data/V13_ASVtab.txt", sep="\t",check.names=FALSE) %>%
+  rename("ASV" = "#OTU ID")
+
+V13_ASVtax <- read.csv("data/V13ASV_vs_MiDAS_5.0.sintax", sep="\t", header = FALSE) %>%
+  select(1,4) %>%
+  mutate(V4=gsub(":","__",V4)) %>%
+  separate(V4, c("Kingdom","Phylum","Class","Order","Family","Genus","Species"), sep=",") %>%
+  rename("ASV" = V1)
+
+V13_usearch_otutable <- merge.data.frame(V13_ASVtab, V13_ASVtax, by ="ASV", all.x = TRUE)
+
+#Convert ASV to genus-table
+V13_usearch_gtable <- mutate(V13_usearch_otutable, Species=NA) %>%
+  mutate(Kingdom=ifelse(is.na(Genus),NA,Kingdom)) %>%
+  mutate(Phylum=ifelse(is.na(Genus),NA,Phylum)) %>%
+  mutate(Class=ifelse(is.na(Genus),NA,Class)) %>%         
+  mutate(Order=ifelse(is.na(Genus),NA,Order)) %>%
+  mutate(Family=ifelse(is.na(Genus),NA,Family)) %>%
+  mutate(OTU=substr(Genus,4,100)) %>%
+  group_by(OTU,Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  summarise(across(starts_with("MQ"), sum)) %>%
+  relocate(c(Kingdom, Phylum, Class, Order, Family, Genus, Species), .after = last_col()) %>%
+  mutate(OTU=ifelse(is.na(OTU),"Unclassified",OTU))
+
+d13 <- amp_load(otutable = V13_usearch_gtable, 
+              metadata = V13_metadata)
+
+d13n <- amp_subset_samples(d13, minreads = 10000, normalise = TRUE)
+
+#remove ASVs with no Genus classification
+V13_ASVs_nogenus <- as.character(d13n$tax[d13n$tax$Genus == "" | is.na(d13n$tax$Genus),"OTU"])
+d13n_genus <- amp_subset_taxa(d13n, tax_vector = V13_ASVs_nogenus, remove = TRUE)
+
+
+### Load V4 data
+
+#Subset metadata based on V4 samples
+V4_metadata <- read.csv("data/V4c_Metadata.txt", sep=",",header = FALSE)
+V4_metadata <- mutate(V4_metadata, Sample_id = str_extract(V2, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+V4_metadata <- merge.data.frame(V4_metadata, Sample_metadata, by ="Sample_id", all.x = TRUE) %>%
+  select(V1, everything())
+
+#Load V4ASV table and taxonomy manually
+V4_ASVtab <- read.csv("data/V4_ASVtab.txt", sep="\t",check.names=FALSE) %>%
+  rename("ASV" = "#OTU ID")
+
+V4_ASVtax <- read.csv("data/V4ASV_vs_MiDAS_5.0.sintax", sep="\t", header = FALSE) %>%
+  select(1,4) %>%
+  mutate(V4=gsub(":","__",V4)) %>%
+  separate(V4, c("Kingdom","Phylum","Class","Order","Family","Genus","Species"), sep=",") %>%
+  rename("ASV" = V1)
+
+V4_usearch_otutable <- merge.data.frame(V4_ASVtab, V4_ASVtax, by ="ASV", all.x = TRUE)
+
+#Convert ASV to genus-table
+V4_usearch_gtable <- mutate(V4_usearch_otutable, Species=NA) %>%
+  mutate(Kingdom=ifelse(is.na(Genus),NA,Kingdom)) %>%
+  mutate(Phylum=ifelse(is.na(Genus),NA,Phylum)) %>%
+  mutate(Class=ifelse(is.na(Genus),NA,Class)) %>%         
+  mutate(Order=ifelse(is.na(Genus),NA,Order)) %>%
+  mutate(Family=ifelse(is.na(Genus),NA,Family)) %>%
+  mutate(OTU=substr(Genus,4,100)) %>%
+  group_by(OTU,Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  summarise(across(starts_with("MQ"), sum)) %>%
+  relocate(c(Kingdom, Phylum, Class, Order, Family, Genus, Species), .after = last_col()) %>%
+  mutate(OTU=ifelse(is.na(OTU),"Unclassified",OTU))
+
+d4 <- amp_load(otutable = V4_usearch_gtable, 
+              metadata = V4_metadata)
+
+d4n <- amp_subset_samples(d4, minreads = 10000, normalise = TRUE)
+
+#remove ASVs with no Genus classification
+V4_ASVs_nogenus <- as.character(d4n$tax[d4n$tax$Genus == "" | is.na(d4n$tax$Genus),"OTU"])
+d4n_genus <- amp_subset_taxa(d4n, tax_vector = V4_ASVs_nogenus, remove = TRUE)
+
+### Load V3-V5 data
+
+#Subset metadata based on V4 samples
+V35_metadata <- read.csv("data/V35_Metadata.txt", sep=",",header = FALSE)
+V35_metadata <- mutate(V35_metadata, Sample_id = str_extract(V2, pattern = "[A-Z,2]{2,3}-[0-9]{2}-[A,B]"))
+V35_metadata <- merge.data.frame(V35_metadata, Sample_metadata, by ="Sample_id", all.x = TRUE) %>%
+  select(V1, everything())
+
+#Load V35ASV table and taxonomy manually
+V35_ASVtab <- read.csv("data/V35_reverse_250bp_ASVtab.txt", sep="\t",check.names=FALSE) %>%
+  rename("ASV" = "#OTU ID")
+
+V35_ASVtax <- read.csv("data/V35_reverse_250bp_ASV_vs_MiDAS_5.0.sintax", sep="\t", header = FALSE) %>%
+  select(1,4) %>%
+  mutate(V4=gsub(":","__",V4)) %>%
+  separate(V4, c("Kingdom","Phylum","Class","Order","Family","Genus","Species"), sep=",") %>%
+  rename("ASV" = V1)
+
+V35_usearch_otutable <- merge.data.frame(V35_ASVtab, V35_ASVtax, by ="ASV", all.x = TRUE)
+
+#Convert ASV to genus-table
+V35_usearch_gtable <- mutate(V35_usearch_otutable, Species=NA) %>%
+  mutate(Kingdom=ifelse(is.na(Genus),NA,Kingdom)) %>%
+  mutate(Phylum=ifelse(is.na(Genus),NA,Phylum)) %>%
+  mutate(Class=ifelse(is.na(Genus),NA,Class)) %>%         
+  mutate(Order=ifelse(is.na(Genus),NA,Order)) %>%
+  mutate(Family=ifelse(is.na(Genus),NA,Family)) %>%
+  mutate(OTU=substr(Genus,4,100)) %>%
+  group_by(OTU,Kingdom, Phylum, Class, Order, Family, Genus, Species) %>%
+  summarise(across(starts_with("MQ"), sum)) %>%
+  relocate(c(Kingdom, Phylum, Class, Order, Family, Genus, Species), .after = last_col()) %>%
+  mutate(OTU=ifelse(is.na(OTU),"Unclassified",OTU))
+
+d35 <- amp_load(otutable = V35_usearch_gtable, 
+              metadata = V35_metadata)
+
+#Subset for archaea and remove samples with too few reads
+d35_arc <- amp_subset_taxa(d35, tax_vector = "d__Archaea", normalise = FALSE)
+d35n <- amp_subset_samples(d35_arc, minreads = 10000, normalise = TRUE)
+
+#remove ASVs with no Genus classification
+V35_ASVs_nogenus <- as.character(d35n$tax[d35n$tax$Genus == "" | is.na(d35n$tax$Genus),"OTU"])
+d35n_genus <- amp_subset_taxa(d35n, tax_vector = V35_ASVs_nogenus, remove = TRUE)
+```
+
+##V1-V3 Create ordinations
+```{r}
+# Remove samples with missing metadata
+d13n_genus <- amp_subset_samples(d13n_genus, !(is.na(Digester_technology) | Digester_technology==""))
+d13n_genus <- amp_subset_samples(d13n_genus, !(is.na(Primary_substrate) | Primary_substrate==""))
+d13n_genus <- amp_subset_samples(d13n_genus, !(is.na(Temperature_range) | Temperature_range==""))
+d13n_genus <- amp_subset_samples(d13n_genus, !(is.na(Continent) | Continent==""))
+
+# Order factors
+d13n_genus$metadata$Digester_technology <- factor(d13n_genus$metadata$Digester_technology, levels=c("Plug-Flow","RCM/CSTR","UASB","TSAD","Other"))
+d13n_genus$metadata$Primary_substrate <- factor(d13n_genus$metadata$Primary_substrate, levels=c("Food waste","Industrial","Manure","Wastewater sludge","Other"))
+d13n_genus$metadata$Temperature_range <- factor(d13n_genus$metadata$Temperature_range, levels=c("Mesophilic","Thermophilic"))
+d13n_genus$metadata$Continent <- factor(d13n_genus$metadata$Continent, levels=c("Asia","Europe","North America","South America","Oceania"))
+
+
+######################
+#~Digester_technology
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p1a <- amp_ordinate(d13n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Digester_technology",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p1a$layers[[1]]$aes_params$alpha <- 1
+
+
+######################
+#~Primary_substrate
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p1b <- amp_ordinate(d13n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Primary_substrate",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p1b$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~Temperature
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p1c <- amp_ordinate(d13n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Temperature_range",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p1c$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~Continent
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p1d <- amp_ordinate(d13n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Continent",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p1d$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~ADONIS analyses 
+######################
+bc.dist.matrix <- vegdist(t(d13n_genus$abund), method = "bray")
+metadata <- d13n_genus$metadata
+
+
+metadata <- as.data.frame(unclass(metadata),                     # Convert all columns to factor
+                       stringsAsFactors = TRUE)
+
+# Digester_technology
+adonis2(bc.dist.matrix ~ Digester_technology, data = metadata)
+
+# Primary_substrate
+adonis2(bc.dist.matrix ~ Primary_substrate, data = metadata)
+
+# Temperature
+adonis2(bc.dist.matrix ~ Temperature_range, data = metadata)
+
+# Continent
+adonis2(bc.dist.matrix ~ Continent, data = metadata)
+```
+
+##V4 Create ordinations
+```{r}
+# Remove samples with missing metadata
+d4n_genus <- amp_subset_samples(d4n_genus, !(is.na(Digester_technology) | Digester_technology==""))
+d4n_genus <- amp_subset_samples(d4n_genus, !(is.na(Primary_substrate) | Primary_substrate==""))
+d4n_genus <- amp_subset_samples(d4n_genus, !(is.na(Temperature_range) | Temperature_range==""))
+d4n_genus <- amp_subset_samples(d4n_genus, !(is.na(Continent) | Continent==""))
+
+# Order factors
+d4n_genus$metadata$Digester_technology <- factor(d4n_genus$metadata$Digester_technology, levels=c("Plug-Flow","RCM/CSTR","UASB","TSAD","Other"))
+d4n_genus$metadata$Primary_substrate <- factor(d4n_genus$metadata$Primary_substrate, levels=c("Food waste","Industrial","Manure","Wastewater sludge","Other"))
+d4n_genus$metadata$Temperature_range <- factor(d4n_genus$metadata$Temperature_range, levels=c("Mesophilic","Thermophilic"))
+d4n_genus$metadata$Continent <- factor(d4n_genus$metadata$Continent, levels=c("Asia","Europe","North America","South America","Oceania"))
+
+######################
+#~Digester_technology
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p2a <- amp_ordinate(d4n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Digester_technology",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p2a$layers[[1]]$aes_params$alpha <- 1
+
+
+######################
+#~Primary_substrate
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p2b <- amp_ordinate(d4n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Primary_substrate",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p2b$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~Temperature
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p2c <- amp_ordinate(d4n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Temperature_range",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p2c$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~Continent
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p2d <- amp_ordinate(d4n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Continent",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p2d$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~ADONIS analyses 
+######################
+bc.dist.matrix <- vegdist(t(d4n_genus$abund), method = "bray")
+metadata <- d4n_genus$metadata
+
+# Digester_technology
+adonis2(bc.dist.matrix ~ Digester_technology, data = metadata)
+
+# Primary_substrate
+adonis2(bc.dist.matrix ~ Primary_substrate, data = metadata)
+
+# Temperature
+adonis2(bc.dist.matrix ~ Temperature_range, data = metadata)
+
+# Continent
+adonis2(bc.dist.matrix ~ Continent, data = metadata)
+```
+##V3-V5 Create ordinations
+```{r}
+# Remove samples with missing metadata
+d35n_genus <- amp_subset_samples(d35n_genus, !(is.na(Digester_technology) | Digester_technology==""))
+d35n_genus <- amp_subset_samples(d35n_genus, !(is.na(Primary_substrate) | Primary_substrate==""))
+d35n_genus <- amp_subset_samples(d35n_genus, !(is.na(Temperature_range) | Temperature_range==""))
+d35n_genus <- amp_subset_samples(d35n_genus, !(is.na(Continent) | Continent==""))
+
+# Order factors
+d35n_genus$metadata$Digester_technology <- factor(d35n_genus$metadata$Digester_technology, levels=c("Plug-Flow","RCM/CSTR","UASB","TSAD","Other"))
+d35n_genus$metadata$Primary_substrate <- factor(d35n_genus$metadata$Primary_substrate, levels=c("Food waste","Industrial","Manure","Wastewater sludge","Other"))
+d35n_genus$metadata$Temperature_range <- factor(d35n_genus$metadata$Temperature_range, levels=c("Mesophilic","Thermophilic"))
+d35n_genus$metadata$Continent <- factor(d35n_genus$metadata$Continent, levels=c("Asia","Europe","North America","South America","Oceania"))
+
+
+######################
+#~Digester_technology
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p3a <- amp_ordinate(d35n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Digester_technology",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p3a$layers[[1]]$aes_params$alpha <- 1
+
+
+######################
+#~Primary_substrate
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p3b <- amp_ordinate(d35n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Primary_substrate",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p3b$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~Temperature
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p3c <- amp_ordinate(d35n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Temperature_range",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p3c$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~Continent
+######################
+# PCoA plot (Bray-Curtis diversity of genera)
+p3d <- amp_ordinate(d35n_genus,
+             type = "PCoA",
+             transform="none",
+             distmeasure = "bray",
+             sample_color_by = "Continent",
+             sample_point_size = 3,
+             filter_species = 0,
+             sample_colorframe = FALSE)+
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(colour = "black"), 
+        axis.text.x = element_text(colour = "black"))+
+  scale_color_brewer(palette="Set2")
+p3d$layers[[1]]$aes_params$alpha <- 1
+
+######################
+#~ADONIS analyses 
+######################
+bc.dist.matrix <- vegdist(t(d35n_genus$abund), method = "bray")
+metadata <- d35n_genus$metadata
+
+# Digester_technology
+adonis2(bc.dist.matrix ~ Digester_technology, data = metadata)
+
+# Primary_substrate
+adonis2(bc.dist.matrix ~ Primary_substrate, data = metadata)
+
+# Temperature
+adonis2(bc.dist.matrix ~ Temperature_range, data = metadata)
+
+# Continent
+adonis2(bc.dist.matrix ~ Continent, data = metadata)
+```
+
+##Combine figures and export
+```{r}
+p <- ( p1a | p1b | p1c | p1d) / ( p2a | p2b | p2c | p2d) / ( p3a | p3b | p3c | p3d)
+ggsave(filename="output/Figure4_Beta-diversity_BC_PCoA.pdf", plot=p, width=20, height=15, useDingbats=FALSE, limitsize=FALSE)
+```
