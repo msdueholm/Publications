@@ -26,7 +26,8 @@
   * R-scripts for reproducing the figures are available at GitHub: [Dueholm2022b](https://github.com/msdueholm/Publications/tree/master/Dueholm2022b)
   * Raw data files for the R-scripts are available at figshare: (https://doi.org/10.6084/m9.figshare.21287112.v1)
 
-## [Overgaard2023: "Benchmarking long-read sequencing strategies for obtaining ASV-resolved rRNA operons from environmental microeukaryotes"](https://github.com/msdueholm/Publications/tree/master/Overgaard2023)
+## [Overgaard2024: "Benchmarking long-read sequencing strategies for obtaining ASV-resolved rRNA operons from environmental microeukaryotes"](https://github.com/msdueholm/Publications/tree/master/Overgaard2024)
 * Data availability
   * The raw sequencing data is available at the European Nucleotide Archive with BioProject ID: [PRJNA1019781](https://www.ebi.ac.uk/ena/browser/view/PRJNA1019781).
-  * RMarkdown files including raw data for reproducing the figures are available at GitHub: [Overgaard2023](https://github.com/msdueholm/Publications/tree/master/Overgaard2023)
+  * RMarkdown files including raw data for reproducing the figures are available at GitHub: [Overgaard2024](https://github.com/msdueholm/Publications/tree/master/Overgaard2024)
+  * Scripts used for data processing are available at GitHub: [Overgaard2024](https://github.com/msdueholm/Publications/tree/master/Overgaard2024)
