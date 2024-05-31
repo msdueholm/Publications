@@ -1,0 +1,81 @@
+---
+title: "dada2"
+author: "CKO, adapted from Jamy et al. 2019"
+date: '2022-11-17'
+output: html_document
+---
+# Setup
+```{r}
+library(dada2);packageVersion("dada2")
+library(Biostrings); packageVersion("Biostrings")
+library(ggplot2); packageVersion("ggplot2")
+library(reshape2); packageVersion("reshape2")
+library(ShortRead); packageVersion("ShortRead")
+```
+
+# Specify paths 
+```{r}
+
+path <- setwd("/user_data/cko/Projects/P004/Undiluted_CKO_P004_J017/ASVs_16257/dada2/")
+#
+```
+
+# Dereplicate
+```{r}
+# Convert the fasta files to fastq file for dereplication input (same method as derepFasta uses https://rdrr.io/bioc/dada2/src/R/sequenceIO.R)
+#data <- readDNAStringSet("consensus_oriented.fasta")
+#writeXStringSet(data, "consensus_oriented.fastq", format = "fastq")
+
+# Derep
+drp <- derepFastq("undil_oriented_16257.fastq", qualityType = "FastqQuality", verbose=TRUE)
+
+```
+
+# Learn error
+```{r}
+err <- learnErrors(drp, 
+        errorEstimationFunction=noqualErrfun, 
+        randomize = TRUE, 
+        BAND_SIZE=32, 
+        multithread=TRUE, 
+        qualityType = "FastqQuality", 
+        verbose = TRUE)
+
+#Different error functions: https://rdrr.io/github/benjjneb/dada2/src/R/errorModels.R
+#BAND_SIZE: When set, banded Needleman-Wunsch alignments are performed. Banding restricts the net cumulative number of insertion of one sequence relative to the other. The default value of BAND_SIZE is 16. If DADA is applied to sequencing technologies with high rates of indels, such as 454 sequencing, the BAND_SIZE parameter should be increased. Setting BAND_SIZE to a negative number turns off banding (i.e. full Needleman-Wunsch).
+```
+
+```{r}
+saveRDS(err, file.path(path, "err_undil_16257_qscore40_noqualErrfun.rds"))
+```
+
+# Inspect errors
+```{r}
+plotErrors(err)
+```
+
+# Denosing
+```{r}
+dd2 <- dada(drp, err=err, BAND_SIZE=32, multithread=TRUE)
+```
+
+```{r}
+saveRDS(dd2, file.path(path, "/unfiltered/dd2_16257_qscore40.rds"))
+```
+
+# Chimera check
+```{r}
+bim2 <- isBimeraDenovo(dd2, minFoldParentOverAbundance=2, minParentAbundance = 2, multithread = TRUE, verbose = T)
+
+table(bim2)
+
+write.table(bim2, file = "ASVs_unfiltered_qscore40_minsize2.fasta", sep = "  ", row.names = T, col.names = T)
+```
+
+# Remove the fastq files we generated earlier to clean up
+```{r}
+#unlink("filtered", recursive = TRUE)
+#unlink("noprimers", recursive = TRUE)
+```
+
+

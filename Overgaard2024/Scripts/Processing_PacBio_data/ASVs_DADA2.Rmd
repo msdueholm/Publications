@@ -1,0 +1,108 @@
+---
+title: "dada2"
+author: "CKO, adapted from Jamy et al. 2019"
+date: '2022-11-17'
+output: html_document
+---
+# Setup
+```{r}
+library(dada2);packageVersion("dada2")
+library(Biostrings); packageVersion("Biostrings")
+library(ggplot2); packageVersion("ggplot2")
+library(reshape2); packageVersion("reshape2")
+library(ShortRead); packageVersion("ShortRead")
+```
+
+# Specify paths and primers
+```{r}
+
+path <- setwd("/user_data/cko/Projects/P004/PacBio_data/Processing/mock/dada2/filtered_default")
+
+fn <- list.files(path, pattern=".fastq")
+
+F3nd <- "GGCAAGTCTGGTGCCAG"
+R21 <- "GACGAGGCATTTGGCTACCTT"
+
+rc <- dada2:::rc
+theme_set(theme_bw())
+```
+
+# Remove primers and orient reads
+```{r}
+nop <- file.path(path, "noprimers", basename(fn))
+prim <- removePrimers(fn, nop, primer.fwd=F3nd, primer.rev=dada2:::rc(R21), orient=TRUE, verbose=TRUE)
+```
+
+# Inspect length distribution
+```{r}
+pdf("length.pdf")
+hist(nchar(getSequences(nop)), 100)
+dev.off()
+```
+
+# Filter
+```{r}
+filt <- file.path(path, "filtered_default", basename(fn))
+track <- filterAndTrim(fn, filt, minLen=3000, maxLen=6000, maxN=0, rm.phix=FALSE, verbose=TRUE)
+```
+
+# Export filtered seqs as fasta file
+```{r}
+sample <- tools::file_path_sans_ext(basename(fn))
+sample_filt <- paste0(sample, ".filtered.fasta")
+writeFasta(readFastq(filt), sample_filt, width=20000L)
+```
+
+# Dereplicate
+```{r}
+drp_cov20 <- derepFastq("filtered_default_oriented_cov20.fastq", qualityType = "FastqQuality", verbose=TRUE)
+
+```
+
+# Learn error
+```{r}
+err <- learnErrors(drp_cov20, 
+        errorEstimationFunction=PacBioErrfun, 
+        randomize = TRUE, 
+        BAND_SIZE=32, 
+        multithread=TRUE, 
+        qualityType = "FastqQuality", 
+        verbose = TRUE)
+
+#BAND_SIZE: When set, banded Needleman-Wunsch alignments are performed. Banding restricts the net cumulative number of insertion of one sequence relative to the other. The default value of BAND_SIZE is 16. If DADA is applied to sequencing technologies with high rates of indels, such as 454 sequencing, the BAND_SIZE parameter should be increased. Setting BAND_SIZE to a negative number turns off banding (i.e. full Needleman-Wunsch).
+```
+
+```{r}
+saveRDS(err, file.path(path, "err_default_cov20.rds"))
+```
+
+# Inspect errors
+```{r}
+plotErrors(err)
+```
+
+# Denosing
+```{r}
+dd2 <- dada(drp_cov20, err=err, BAND_SIZE=32, multithread=TRUE)
+```
+
+```{r}
+saveRDS(dd2, file.path(path, "/ASV_cov20/dd2_cov20.rds"))
+```
+
+# Chimera check
+```{r}
+bim2 <- isBimeraDenovo(dd2, minFoldParentOverAbundance=2, minParentAbundance = 2, multithread = TRUE, verbose = T)
+
+table(bim2)
+
+write.table(bim2, file = "ASVs_cov20_minsize2.fasta", sep = "  ", row.names = T, col.names = T)
+```
+
+# Remove the fastq files we generated earlier to clean up
+```{r}
+#unlink("filtered", recursive = TRUE)
+#unlink("noprimers", recursive = TRUE)
+```
+
+
